@@ -38,7 +38,6 @@
           class="message"
           :class="`message--${message.role}`"
         >
-          <strong>{{ t(`message.${message.role}`) }}</strong>
           <p>{{ message.content }}</p>
         </article>
       </div>
@@ -183,13 +182,6 @@ async function send() {
   align-self: flex-end;
   border-color: var(--el-color-primary-light-7);
   background: var(--el-color-primary-light-9);
-}
-
-.message strong {
-  display: block;
-  margin-bottom: 6px;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
 }
 
 .message p {

@@ -68,10 +68,5 @@
   },
   "agent": {
     "systemPrompt": "你是一个运行在浏览器内的编程助手。根据用户问题和当前项目文件上下文回答。"
-  },
-  "message": {
-    "user": "用户",
-    "assistant": "助手",
-    "system": "系统"
   }
 }

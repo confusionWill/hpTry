@@ -68,10 +68,5 @@
   },
   "agent": {
     "systemPrompt": "You are a coding assistant running in the browser. Answer using the user request and current project file context."
-  },
-  "message": {
-    "user": "User",
-    "assistant": "Assistant",
-    "system": "System"
   }
 }
