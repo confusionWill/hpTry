@@ -1,0 +1,77 @@
+{
+  "app": {
+    "title": "Browser Agent"
+  },
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "create": "Create",
+    "delete": "Delete",
+    "edit": "Edit",
+    "save": "Save",
+    "empty": "No data",
+    "name": "Name",
+    "description": "Description",
+    "actions": "Actions",
+    "required": "Required",
+    "loading": "Loading",
+    "settings": "Settings"
+  },
+  "project": {
+    "title": "Projects",
+    "create": "Create project",
+    "selectPlaceholder": "Select project",
+    "namePlaceholder": "Project name",
+    "descriptionPlaceholder": "Project description",
+    "emptyTitle": "Create a project first",
+    "emptyDescription": "Create a project before starting conversations or managing files."
+  },
+  "conversation": {
+    "title": "Conversations",
+    "new": "New conversation",
+    "namePlaceholder": "Conversation title",
+    "empty": "No conversations",
+    "selectEmpty": "Select or create a conversation",
+    "inputPlaceholder": "Type a message, Enter to send, Shift + Enter for newline",
+    "send": "Send",
+    "sending": "Sending",
+    "deleteConfirm": "Delete this conversation?"
+  },
+  "file": {
+    "title": "Files",
+    "new": "New file",
+    "path": "Path",
+    "pathPlaceholder": "Example: src/main.ts",
+    "content": "Content",
+    "contentPlaceholder": "Enter file content",
+    "empty": "No files",
+    "saveSuccess": "File saved",
+    "deleteConfirm": "Delete this file?"
+  },
+  "provider": {
+    "title": "Providers",
+    "manage": "Providers",
+    "add": "Add provider",
+    "edit": "Edit provider",
+    "selectPlaceholder": "Select provider",
+    "empty": "No providers",
+    "namePlaceholder": "Example: OpenAI",
+    "baseUrl": "Base URL",
+    "baseUrlPlaceholder": "https://api.openai.com/v1",
+    "apiKey": "API Key",
+    "apiKeyPlaceholder": "Enter API Key",
+    "model": "Model",
+    "modelPlaceholder": "Example: gpt-4.1-mini",
+    "deleteConfirm": "Delete this provider?",
+    "requestFailed": "Request failed. Check provider settings.",
+    "missing": "Select a provider first."
+  },
+  "agent": {
+    "systemPrompt": "You are a coding assistant running in the browser. Answer using the user request and current project file context."
+  },
+  "message": {
+    "user": "User",
+    "assistant": "Assistant",
+    "system": "System"
+  }
+}
