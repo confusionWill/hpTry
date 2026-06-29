@@ -22,15 +22,7 @@ export interface ChatMessage {
   role: MessageRole
   content: string
   createdAt: number
-}
-
-export interface WorkspaceFile {
-  id: string
-  projectId: string
-  path: string
-  content: string
-  createdAt: number
-  updatedAt: number
+  responseDurationMs?: number
 }
 
 export interface Provider {
@@ -58,10 +50,4 @@ export interface ProjectPayload {
 export interface ConversationPayload {
   projectId: string
   title: string
-}
-
-export interface FilePayload {
-  projectId: string
-  path: string
-  content: string
 }

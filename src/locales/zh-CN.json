@@ -15,7 +15,8 @@
     "actions": "操作",
     "required": "必填",
     "loading": "加载中",
-    "settings": "设置"
+    "settings": "设置",
+    "close": "关闭"
   },
   "project": {
     "title": "项目",
@@ -24,7 +25,7 @@
     "namePlaceholder": "项目名称",
     "descriptionPlaceholder": "项目描述",
     "emptyTitle": "先创建项目",
-    "emptyDescription": "创建项目后才能开始会话和管理文件。"
+    "emptyDescription": "创建项目后才能开始会话。"
   },
   "conversation": {
     "title": "会话",
@@ -35,26 +36,12 @@
     "inputPlaceholder": "输入消息，按 Enter 发送，Shift + Enter 换行",
     "send": "发送",
     "sending": "发送中",
+    "answerDuration": "回答耗时：{duration}",
     "deleteConfirm": "确认删除该会话？"
   },
-  "file": {
-    "title": "文件",
-    "new": "新建文件",
-    "path": "路径",
-    "pathPlaceholder": "例如 src/main.ts",
-    "content": "内容",
-    "contentPlaceholder": "输入文件内容",
-    "empty": "暂无文件",
-    "saveSuccess": "文件已保存",
-    "deleteConfirm": "确认删除该文件？"
-  },
   "provider": {
-    "title": "供应商",
-    "manage": "供应商",
     "add": "添加供应商",
     "edit": "编辑供应商",
-    "selectPlaceholder": "选择供应商",
-    "empty": "暂无供应商",
     "namePlaceholder": "例如 OpenAI",
     "baseUrl": "接口地址",
     "baseUrlPlaceholder": "https://api.openai.com/v1",
@@ -67,6 +54,6 @@
     "missing": "请先选择供应商。"
   },
   "agent": {
-    "systemPrompt": "你是一个运行在浏览器内的编程助手。根据用户问题和当前项目文件上下文回答。"
+    "systemPrompt": "你是一个运行在浏览器内的编程助手。根据用户问题和当前会话上下文回答。"
   }
 }

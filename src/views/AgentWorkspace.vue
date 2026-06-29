@@ -1,21 +1,18 @@
 <template>
   <main class="workspace">
-    <ProjectConversationSidebar />
+    <ProjectConversationSidebar @open-providers="providerDialogVisible = true" />
 
     <section v-if="store.projects.length === 0 && !store.loading" class="project-empty">
-      <el-empty :description="t('project.emptyTitle')">
+      <UiEmpty :description="t('project.emptyTitle')">
         <p>{{ t('project.emptyDescription') }}</p>
-      </el-empty>
+      </UiEmpty>
     </section>
 
     <template v-else>
-      <ChatPanel @open-providers="providerDrawerVisible = true" />
-      <aside class="right-panel">
-        <FileManager />
-      </aside>
+      <ChatPanel />
     </template>
 
-    <ProviderManager v-model="providerDrawerVisible" />
+    <ProviderManager v-model="providerDialogVisible" />
   </main>
 </template>
 
@@ -24,14 +21,14 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import ChatPanel from '@/components/ChatPanel.vue'
-import FileManager from '@/components/FileManager.vue'
 import ProjectConversationSidebar from '@/components/ProjectConversationSidebar.vue'
 import ProviderManager from '@/components/ProviderManager.vue'
+import UiEmpty from '@/components/ui/UiEmpty.vue'
 import { useAgentStore } from '@/stores/agent'
 
 const store = useAgentStore()
 const { t } = useI18n()
-const providerDrawerVisible = ref(false)
+const providerDialogVisible = ref(false)
 
 onMounted(() => {
   void store.load()
@@ -54,26 +51,12 @@ onMounted(() => {
 
 .project-empty p {
   margin: 8px 0 0;
-  color: var(--el-text-color-secondary);
-}
-
-.right-panel {
-  display: flex;
-  width: 430px;
-  min-width: 430px;
-  height: 100%;
-  border-left: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color);
-  padding: 16px;
+  color: var(--ui-text-color-secondary);
 }
 
 @media (max-width: 1100px) {
   .workspace {
     overflow: auto;
-  }
-
-  .right-panel {
-    min-width: 360px;
   }
 }
 </style>

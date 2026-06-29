@@ -15,7 +15,8 @@
     "actions": "Actions",
     "required": "Required",
     "loading": "Loading",
-    "settings": "Settings"
+    "settings": "Settings",
+    "close": "Close"
   },
   "project": {
     "title": "Projects",
@@ -24,7 +25,7 @@
     "namePlaceholder": "Project name",
     "descriptionPlaceholder": "Project description",
     "emptyTitle": "Create a project first",
-    "emptyDescription": "Create a project before starting conversations or managing files."
+    "emptyDescription": "Create a project before starting conversations."
   },
   "conversation": {
     "title": "Conversations",
@@ -35,26 +36,12 @@
     "inputPlaceholder": "Type a message, Enter to send, Shift + Enter for newline",
     "send": "Send",
     "sending": "Sending",
+    "answerDuration": "Answered in {duration}",
     "deleteConfirm": "Delete this conversation?"
   },
-  "file": {
-    "title": "Files",
-    "new": "New file",
-    "path": "Path",
-    "pathPlaceholder": "Example: src/main.ts",
-    "content": "Content",
-    "contentPlaceholder": "Enter file content",
-    "empty": "No files",
-    "saveSuccess": "File saved",
-    "deleteConfirm": "Delete this file?"
-  },
   "provider": {
-    "title": "Providers",
-    "manage": "Providers",
     "add": "Add provider",
     "edit": "Edit provider",
-    "selectPlaceholder": "Select provider",
-    "empty": "No providers",
     "namePlaceholder": "Example: OpenAI",
     "baseUrl": "Base URL",
     "baseUrlPlaceholder": "https://api.openai.com/v1",
@@ -67,6 +54,6 @@
     "missing": "Select a provider first."
   },
   "agent": {
-    "systemPrompt": "You are a coding assistant running in the browser. Answer using the user request and current project file context."
+    "systemPrompt": "You are a coding assistant running in the browser. Answer using the user request and current conversation context."
   }
 }

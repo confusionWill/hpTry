@@ -3,19 +3,17 @@ import type {
   Conversation,
   Project,
   Provider,
-  WorkspaceFile,
 } from '@/types/agent'
 
 const DB_NAME = 'browser-agent-db'
 const DB_VERSION = 1
 
-export type StoreName = 'projects' | 'conversations' | 'messages' | 'files' | 'providers'
+export type StoreName = 'projects' | 'conversations' | 'messages' | 'providers'
 
 export interface StoreMap {
   projects: Project
   conversations: Conversation
   messages: ChatMessage
-  files: WorkspaceFile
   providers: Provider
 }
 
@@ -47,12 +45,6 @@ function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('messages')) {
         const store = db.createObjectStore('messages', { keyPath: 'id' })
         store.createIndex('conversationId', 'conversationId')
-      }
-
-      if (!db.objectStoreNames.contains('files')) {
-        const store = db.createObjectStore('files', { keyPath: 'id' })
-        store.createIndex('projectId', 'projectId')
-        store.createIndex('projectPath', ['projectId', 'path'], { unique: true })
       }
 
       if (!db.objectStoreNames.contains('providers')) {

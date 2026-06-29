@@ -1,72 +1,110 @@
 <template>
-  <el-drawer v-model="visible" :title="t('provider.title')" size="420px">
-    <div class="provider-manager">
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="t('common.name')" required>
-          <el-input v-model="form.name" :placeholder="t('provider.namePlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="t('provider.baseUrl')" required>
-          <el-input v-model="form.baseUrl" :placeholder="t('provider.baseUrlPlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="t('provider.apiKey')" required>
-          <el-input
-            v-model="form.apiKey"
-            :placeholder="t('provider.apiKeyPlaceholder')"
-            show-password
-            type="password"
-          />
-        </el-form-item>
-        <el-form-item :label="t('provider.model')" required>
-          <el-input v-model="form.model" :placeholder="t('provider.modelPlaceholder')" />
-        </el-form-item>
-        <el-button
-          :disabled="!canSave"
-          type="primary"
-          @click="saveProvider"
-        >
-          {{ editingProviderId ? t('common.save') : t('provider.add') }}
-        </el-button>
-      </el-form>
-
-      <el-divider />
-
-      <el-empty
-        v-if="store.providers.length === 0"
-        :description="t('provider.empty')"
-        :image-size="80"
-      />
-
-      <div v-else class="provider-list">
+  <UiDialog
+    v-model="visible"
+    :aria-label="t('common.settings')"
+    :close-label="t('common.close')"
+    :title="t('common.settings')"
+    width="50vw"
+    @closed="resetForm"
+  >
+    <div class="provider-picker">
+      <div
+        v-for="provider in store.providers"
+        :key="provider.id"
+        class="provider-item"
+      >
         <div
-          v-for="provider in store.providers"
-          :key="provider.id"
-          class="provider-item"
-          :class="{ 'provider-item--active': provider.id === store.selectedProviderId }"
+          class="provider-circle"
+          :class="{ 'provider-circle--active': provider.id === store.selectedProviderId }"
         >
-          <button type="button" @click="store.selectedProviderId = provider.id">
+          <button
+            class="provider-select"
+            type="button"
+            @click="store.selectedProviderId = provider.id"
+          >
             <span>{{ provider.name }}</span>
-            <small>{{ provider.model }}</small>
           </button>
-          <el-button :icon="Edit" text @click="editProvider(provider.id)" />
-          <el-button :icon="Delete" text @click="confirmDeleteProvider(provider.id)" />
+          <button
+            :aria-label="t('common.edit')"
+            class="provider-edit"
+            type="button"
+            @click.stop="editProvider(provider.id)"
+          >
+            <Edit3 :size="16" />
+          </button>
         </div>
       </div>
+
+      <button
+        :aria-label="t('provider.add')"
+        class="provider-circle provider-circle--add"
+        type="button"
+        @click="startCreate"
+      >
+        <Plus :size="30" />
+      </button>
     </div>
-  </el-drawer>
+  </UiDialog>
+
+  <UiDialog
+    v-model="formVisible"
+    :close-label="t('common.close')"
+    :title="formTitle"
+    width="520px"
+    @closed="resetForm"
+  >
+    <form @submit.prevent="saveProvider">
+      <UiFormItem :label="t('common.name')" required>
+        <UiInput v-model="form.name" :placeholder="t('provider.namePlaceholder')" />
+      </UiFormItem>
+      <UiFormItem :label="t('provider.baseUrl')" required>
+        <UiInput v-model="form.baseUrl" :placeholder="t('provider.baseUrlPlaceholder')" />
+      </UiFormItem>
+      <UiFormItem :label="t('provider.apiKey')" required>
+        <UiInput
+          v-model="form.apiKey"
+          :placeholder="t('provider.apiKeyPlaceholder')"
+          type="password"
+        />
+      </UiFormItem>
+      <UiFormItem :label="t('provider.model')" required>
+        <UiInput v-model="form.model" :placeholder="t('provider.modelPlaceholder')" />
+      </UiFormItem>
+    </form>
+
+    <template #footer>
+      <UiButton v-if="editingProviderId" danger text @click="confirmDeleteProvider">
+        {{ t('common.delete') }}
+      </UiButton>
+      <span />
+      <UiButton @click="formVisible = false">
+        {{ t('common.cancel') }}
+      </UiButton>
+      <UiButton :disabled="!canSave" variant="primary" @click="saveProvider">
+        {{ editingProviderId ? t('common.save') : t('provider.add') }}
+      </UiButton>
+    </template>
+  </UiDialog>
 </template>
 
 <script setup lang="ts">
-import { Delete, Edit } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
+import { Edit3, Plus } from '@lucide/vue'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import UiButton from '@/components/ui/UiButton.vue'
+import UiDialog from '@/components/ui/UiDialog.vue'
+import UiFormItem from '@/components/ui/UiFormItem.vue'
+import UiInput from '@/components/ui/UiInput.vue'
 import { useAgentStore } from '@/stores/agent'
+import { useUiStore } from '@/stores/ui'
 
 const visible = defineModel<boolean>({ required: true })
 
 const store = useAgentStore()
+const uiStore = useUiStore()
 const { t } = useI18n()
+const formVisible = ref(false)
 const editingProviderId = ref('')
 const form = reactive({
   name: '',
@@ -75,9 +113,11 @@ const form = reactive({
   model: '',
 })
 
-const canSave = computed(
-  () => form.name.trim() && form.baseUrl.trim() && form.apiKey.trim() && form.model.trim(),
+const canSave = computed(() =>
+  Boolean(form.name.trim() && form.baseUrl.trim() && form.apiKey.trim() && form.model.trim()),
 )
+
+const formTitle = computed(() => (editingProviderId.value ? t('provider.edit') : t('provider.add')))
 
 function resetForm() {
   editingProviderId.value = ''
@@ -87,6 +127,11 @@ function resetForm() {
   form.model = ''
 }
 
+function startCreate() {
+  resetForm()
+  formVisible.value = true
+}
+
 function editProvider(providerId: string) {
   const provider = store.providers.find((item) => item.id === providerId)
 
@@ -94,11 +139,13 @@ function editProvider(providerId: string) {
     return
   }
 
+  store.selectedProviderId = provider.id
   editingProviderId.value = provider.id
   form.name = provider.name
   form.baseUrl = provider.baseUrl
   form.apiKey = provider.apiKey
   form.model = provider.model
+  formVisible.value = true
 }
 
 async function saveProvider() {
@@ -111,66 +158,130 @@ async function saveProvider() {
     },
     editingProviderId.value || undefined,
   )
-  resetForm()
+  formVisible.value = false
 }
 
-async function confirmDeleteProvider(providerId: string) {
-  await ElMessageBox.confirm(t('provider.deleteConfirm'), t('common.delete'), {
-    confirmButtonText: t('common.confirm'),
-    cancelButtonText: t('common.cancel'),
+async function confirmDeleteProvider() {
+  const providerId = editingProviderId.value
+
+  if (!providerId) {
+    return
+  }
+
+  const confirmed = await uiStore.requestConfirm({
+    title: t('common.delete'),
+    message: t('provider.deleteConfirm'),
+    confirmText: t('common.confirm'),
+    cancelText: t('common.cancel'),
     type: 'warning',
   })
+
+  if (!confirmed) {
+    return
+  }
+
   await store.deleteProvider(providerId)
+  formVisible.value = false
 }
 </script>
 
 <style scoped>
-.provider-manager {
+.provider-picker {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.provider-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  min-height: 50vh;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 28px 12px 34px;
 }
 
 .provider-item {
+  display: block;
+}
+
+.provider-circle {
+  position: relative;
   display: grid;
-  align-items: center;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 8px;
-  grid-template-columns: 1fr auto auto;
+  width: 100px;
+  height: 100px;
+  place-items: center;
+  border: 1px solid var(--ui-border-color);
+  border-radius: 50%;
+  background: var(--ui-fill-color-light);
+  color: var(--ui-text-color-primary);
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.provider-select {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  line-height: 1.2;
+  padding: 10px;
+  text-align: center;
+}
+
+.provider-circle:hover,
+.provider-circle--active {
+  border-color: var(--ui-color-primary);
+  background: var(--ui-color-primary-light-9);
+  color: var(--ui-color-primary);
+}
+
+.provider-circle span {
+  display: -webkit-box;
+  max-width: 100%;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
-.provider-item--active {
-  border-color: var(--el-color-primary);
-}
-
-.provider-item button:first-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
+.provider-edit {
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  width: 24px;
+  height: 24px;
   border: 0;
   background: transparent;
-  color: var(--el-text-color-primary);
+  color: var(--ui-text-color-secondary);
   cursor: pointer;
-  padding: 10px 12px;
-  text-align: left;
+  display: grid;
+  padding: 0;
+  place-items: center;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.provider-item span,
-.provider-item small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.provider-edit:hover,
+.provider-edit:focus {
+  color: var(--ui-color-primary);
 }
 
-.provider-item small {
-  color: var(--el-text-color-secondary);
+.provider-edit:focus {
+  outline: 0;
 }
+
+.provider-item:hover .provider-edit,
+.provider-item:focus-within .provider-edit {
+  opacity: 1;
+}
+
+.provider-circle--add {
+  font-size: 30px;
+}
+
 </style>

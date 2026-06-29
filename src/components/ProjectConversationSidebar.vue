@@ -2,23 +2,34 @@
   <aside class="sidebar">
     <div class="section">
       <div class="section__header">
-        <h2>{{ t('project.title') }}</h2>
-        <el-button :icon="Plus" circle @click="projectDialogVisible = true" />
+        <UiButton
+          :aria-label="t('common.settings')"
+          circle
+          class="provider-entry"
+          @click="$emit('openProviders')"
+        >
+          <template #icon>
+            <Settings :size="17" />
+          </template>
+        </UiButton>
+        <UiButton
+          :aria-label="t('project.create')"
+          circle
+          @click="projectDialogVisible = true"
+        >
+          <template #icon>
+            <Plus :size="17" />
+          </template>
+        </UiButton>
       </div>
 
-      <el-select
+      <UiSelect
         v-model="selectedProjectId"
         class="project-select"
+        :options="projectOptions"
         :placeholder="t('project.selectPlaceholder')"
         @change="handleProjectChange"
-      >
-        <el-option
-          v-for="project in store.projects"
-          :key="project.id"
-          :label="project.name"
-          :value="project.id"
-        />
-      </el-select>
+      />
 
       <p v-if="store.selectedProject?.description" class="project-description">
         {{ store.selectedProject.description }}
@@ -28,93 +39,128 @@
     <div class="section conversations">
       <div class="section__header">
         <h2>{{ t('conversation.title') }}</h2>
-        <el-button
+        <UiButton
           :disabled="!store.selectedProjectId"
-          :icon="ChatLineRound"
           circle
           @click="conversationDialogVisible = true"
-        />
+        >
+          <template #icon>
+            <MessageCircle :size="17" />
+          </template>
+        </UiButton>
       </div>
 
-      <el-empty
+      <UiEmpty
         v-if="store.conversations.length === 0"
         :description="t('conversation.empty')"
         :image-size="80"
       />
 
       <div v-else class="conversation-list">
-        <button
+        <div
           v-for="conversation in store.conversations"
           :key="conversation.id"
           class="conversation-item"
           :class="{ 'conversation-item--active': conversation.id === store.selectedConversationId }"
-          type="button"
-          @click="store.selectConversation(conversation.id)"
         >
-          <span>{{ conversation.title }}</span>
-          <el-button
+          <button
+            class="conversation-item__select"
+            type="button"
+            @click="store.selectConversation(conversation.id)"
+          >
+            <span>{{ conversation.title }}</span>
+          </button>
+          <UiButton
             :aria-label="t('common.delete')"
-            :icon="Delete"
             text
-            @click.stop="confirmDeleteConversation(conversation.id)"
-          />
-        </button>
+            @click="confirmDeleteConversation(conversation.id)"
+          >
+            <template #icon>
+              <Trash2 :size="16" />
+            </template>
+          </UiButton>
+        </div>
       </div>
     </div>
 
-    <el-dialog v-model="projectDialogVisible" :title="t('project.create')" width="420px">
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="t('common.name')" required>
-          <el-input v-model="projectForm.name" :placeholder="t('project.namePlaceholder')" />
-        </el-form-item>
-        <el-form-item :label="t('common.description')">
-          <el-input
+    <UiDialog
+      v-model="projectDialogVisible"
+      :close-label="t('common.close')"
+      :title="t('project.create')"
+      width="420px"
+    >
+      <form @submit.prevent="createProject">
+        <UiFormItem :label="t('common.name')" required>
+          <UiInput v-model="projectForm.name" :placeholder="t('project.namePlaceholder')" />
+        </UiFormItem>
+        <UiFormItem :label="t('common.description')">
+          <UiTextarea
             v-model="projectForm.description"
             :placeholder="t('project.descriptionPlaceholder')"
-            type="textarea"
           />
-        </el-form-item>
-      </el-form>
+        </UiFormItem>
+      </form>
       <template #footer>
-        <el-button @click="projectDialogVisible = false">
+        <UiButton @click="projectDialogVisible = false">
           {{ t('common.cancel') }}
-        </el-button>
-        <el-button :disabled="!projectForm.name.trim()" type="primary" @click="createProject">
+        </UiButton>
+        <UiButton :disabled="!projectForm.name.trim()" variant="primary" @click="createProject">
           {{ t('common.create') }}
-        </el-button>
+        </UiButton>
       </template>
-    </el-dialog>
+    </UiDialog>
 
-    <el-dialog v-model="conversationDialogVisible" :title="t('conversation.new')" width="420px">
-      <el-form label-position="top" @submit.prevent>
-        <el-form-item :label="t('common.name')" required>
-          <el-input
+    <UiDialog
+      v-model="conversationDialogVisible"
+      :close-label="t('common.close')"
+      :title="t('conversation.new')"
+      width="420px"
+    >
+      <form @submit.prevent="createConversation">
+        <UiFormItem :label="t('common.name')" required>
+          <UiInput
             v-model="conversationTitle"
             :placeholder="t('conversation.namePlaceholder')"
           />
-        </el-form-item>
-      </el-form>
+        </UiFormItem>
+      </form>
       <template #footer>
-        <el-button @click="conversationDialogVisible = false">
+        <UiButton @click="conversationDialogVisible = false">
           {{ t('common.cancel') }}
-        </el-button>
-        <el-button :disabled="!conversationTitle.trim()" type="primary" @click="createConversation">
+        </UiButton>
+        <UiButton
+          :disabled="!conversationTitle.trim()"
+          variant="primary"
+          @click="createConversation"
+        >
           {{ t('common.create') }}
-        </el-button>
+        </UiButton>
       </template>
-    </el-dialog>
+    </UiDialog>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { ChatLineRound, Delete, Plus } from '@element-plus/icons-vue'
-import { ElMessageBox } from 'element-plus'
+import { MessageCircle, Plus, Settings, Trash2 } from '@lucide/vue'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import UiButton from '@/components/ui/UiButton.vue'
+import UiDialog from '@/components/ui/UiDialog.vue'
+import UiEmpty from '@/components/ui/UiEmpty.vue'
+import UiFormItem from '@/components/ui/UiFormItem.vue'
+import UiInput from '@/components/ui/UiInput.vue'
+import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import UiTextarea from '@/components/ui/UiTextarea.vue'
 import { useAgentStore } from '@/stores/agent'
+import { useUiStore } from '@/stores/ui'
+
+defineEmits<{
+  openProviders: []
+}>()
 
 const store = useAgentStore()
+const uiStore = useUiStore()
 const { t } = useI18n()
 
 const projectDialogVisible = ref(false)
@@ -124,6 +170,13 @@ const projectForm = reactive({
   name: '',
   description: '',
 })
+
+const projectOptions = computed<UiSelectOption[]>(() =>
+  store.projects.map((project) => ({
+    label: project.name,
+    value: project.id,
+  })),
+)
 
 const selectedProjectId = computed({
   get: () => store.selectedProjectId,
@@ -160,11 +213,18 @@ async function createConversation() {
 }
 
 async function confirmDeleteConversation(conversationId: string) {
-  await ElMessageBox.confirm(t('conversation.deleteConfirm'), t('common.delete'), {
-    confirmButtonText: t('common.confirm'),
-    cancelButtonText: t('common.cancel'),
+  const confirmed = await uiStore.requestConfirm({
+    title: t('common.delete'),
+    message: t('conversation.deleteConfirm'),
+    confirmText: t('common.confirm'),
+    cancelText: t('common.cancel'),
     type: 'warning',
   })
+
+  if (!confirmed) {
+    return
+  }
+
   await store.deleteConversation(conversationId)
 }
 </script>
@@ -177,8 +237,8 @@ async function confirmDeleteConversation(conversationId: string) {
   height: 100%;
   flex-direction: column;
   gap: 16px;
-  border-right: 1px solid var(--el-border-color-light);
-  background: var(--el-bg-color);
+  border-right: 1px solid var(--ui-border-color-light);
+  background: var(--ui-bg-color);
   padding: 16px;
 }
 
@@ -200,13 +260,17 @@ async function confirmDeleteConversation(conversationId: string) {
   font-weight: 600;
 }
 
+.provider-entry {
+  min-width: 0;
+}
+
 .project-select {
   width: 100%;
 }
 
 .project-description {
   margin: 0;
-  color: var(--el-text-color-secondary);
+  color: var(--ui-text-color-secondary);
   font-size: 13px;
   line-height: 1.5;
 }
@@ -233,14 +297,26 @@ async function confirmDeleteConversation(conversationId: string) {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: var(--el-text-color-primary);
-  cursor: pointer;
+  color: var(--ui-text-color-primary);
   grid-template-columns: 1fr auto;
-  padding: 6px 4px 6px 10px;
+  padding: 6px 4px;
   text-align: left;
 }
 
-.conversation-item span {
+.conversation-item__select {
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 0 6px;
+  text-align: left;
+}
+
+.conversation-item__select span {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -248,7 +324,7 @@ async function confirmDeleteConversation(conversationId: string) {
 
 .conversation-item:hover,
 .conversation-item--active {
-  border-color: var(--el-color-primary-light-7);
-  background: var(--el-color-primary-light-9);
+  border-color: var(--ui-color-primary-light-7);
+  background: var(--ui-color-primary-light-9);
 }
 </style>

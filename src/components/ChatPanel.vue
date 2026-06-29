@@ -7,27 +7,10 @@
           {{ store.selectedProject.name }}
         </p>
       </div>
-      <div class="chat-panel__tools">
-        <el-select
-          v-model="selectedProviderId"
-          class="provider-select"
-          :placeholder="t('provider.selectPlaceholder')"
-        >
-          <el-option
-            v-for="provider in store.providers"
-            :key="provider.id"
-            :label="provider.name"
-            :value="provider.id"
-          />
-        </el-select>
-        <el-button :icon="Setting" @click="$emit('openProviders')">
-          {{ t('provider.manage') }}
-        </el-button>
-      </div>
     </div>
 
     <div v-if="!store.selectedConversationId" class="empty-state">
-      <el-empty :description="t('conversation.selectEmpty')" />
+      <UiEmpty :description="t('conversation.selectEmpty')" />
     </div>
 
     <template v-else>
@@ -39,54 +22,67 @@
           :class="`message--${message.role}`"
         >
           <p>{{ message.content }}</p>
+          <span
+            v-if="message.role === 'assistant' && message.responseDurationMs !== undefined"
+            class="message__answer-duration"
+          >
+            {{
+              t('conversation.answerDuration', {
+                duration: formatAnswerDuration(message.responseDurationMs),
+              })
+            }}
+          </span>
         </article>
       </div>
 
       <div class="composer">
-        <el-input
+        <UiTextarea
           v-model="draft"
-          :autosize="{ minRows: 2, maxRows: 6 }"
+          autosize
+          :min-rows="2"
+          :max-rows="6"
           :placeholder="t('conversation.inputPlaceholder')"
-          resize="none"
-          type="textarea"
           @keydown.enter.exact.prevent="send"
         />
-        <el-button
+        <UiButton
           :disabled="!draft.trim() || store.sending"
-          :icon="Promotion"
           :loading="store.sending"
-          type="primary"
+          variant="primary"
           @click="send"
         >
+          <template #icon>
+            <Send :size="16" />
+          </template>
           {{ store.sending ? t('conversation.sending') : t('conversation.send') }}
-        </el-button>
+        </UiButton>
       </div>
     </template>
   </section>
 </template>
 
 <script setup lang="ts">
-import { Promotion, Setting } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
-import { computed, ref } from 'vue'
+import { Send } from '@lucide/vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import UiButton from '@/components/ui/UiButton.vue'
+import UiEmpty from '@/components/ui/UiEmpty.vue'
+import UiTextarea from '@/components/ui/UiTextarea.vue'
 import { useAgentStore } from '@/stores/agent'
-
-defineEmits<{
-  openProviders: []
-}>()
+import { useUiStore } from '@/stores/ui'
 
 const store = useAgentStore()
+const uiStore = useUiStore()
 const { t } = useI18n()
 const draft = ref('')
 
-const selectedProviderId = computed({
-  get: () => store.selectedProviderId,
-  set: (value: string) => {
-    store.selectedProviderId = value
-  },
-})
+function formatAnswerDuration(durationMs: number): string {
+  if (durationMs < 1000) {
+    return `${durationMs}ms`
+  }
+
+  return `${(durationMs / 1000).toFixed(1)}s`
+}
 
 async function send() {
   const content = draft.value.trim()
@@ -96,7 +92,7 @@ async function send() {
   }
 
   if (!store.selectedProvider) {
-    ElMessage.warning(t('provider.missing'))
+    uiStore.showToast(t('provider.missing'), 'warning')
     return
   }
 
@@ -106,7 +102,7 @@ async function send() {
     await store.sendMessage(content, t('agent.systemPrompt'))
   } catch (error) {
     const message = error instanceof Error ? error.message : t('provider.requestFailed')
-    ElMessage.error(message || t('provider.requestFailed'))
+    uiStore.showToast(message || t('provider.requestFailed'), 'error')
   }
 }
 </script>
@@ -118,7 +114,7 @@ async function send() {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  background: var(--el-bg-color);
+  background: var(--ui-bg-color);
 }
 
 .chat-panel__header {
@@ -127,7 +123,7 @@ async function send() {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border-bottom: 1px solid var(--el-border-color-light);
+  border-bottom: 1px solid var(--ui-border-color-light);
   padding: 14px 18px;
 }
 
@@ -139,18 +135,8 @@ async function send() {
 
 .chat-panel__header p {
   margin: 4px 0 0;
-  color: var(--el-text-color-secondary);
+  color: var(--ui-text-color-secondary);
   font-size: 13px;
-}
-
-.chat-panel__tools {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.provider-select {
-  width: 190px;
 }
 
 .empty-state {
@@ -172,16 +158,16 @@ async function send() {
 
 .message {
   max-width: min(760px, 86%);
-  border: 1px solid var(--el-border-color-light);
+  border: 1px solid var(--ui-border-color-light);
   border-radius: 8px;
-  background: var(--el-fill-color-blank);
+  background: var(--ui-fill-color-blank);
   padding: 12px 14px;
 }
 
 .message--user {
   align-self: flex-end;
-  border-color: var(--el-color-primary-light-7);
-  background: var(--el-color-primary-light-9);
+  border-color: var(--ui-color-primary-light-7);
+  background: var(--ui-color-primary-light-9);
 }
 
 .message p {
@@ -190,11 +176,19 @@ async function send() {
   white-space: pre-wrap;
 }
 
+.message__answer-duration {
+  display: block;
+  margin-top: 8px;
+  color: var(--ui-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .composer {
   display: grid;
   align-items: end;
   gap: 10px;
-  border-top: 1px solid var(--el-border-color-light);
+  border-top: 1px solid var(--ui-border-color-light);
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 14px 18px;
 }

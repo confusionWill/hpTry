@@ -12,12 +12,10 @@ import type {
   ChatMessage,
   Conversation,
   ConversationPayload,
-  FilePayload,
   Project,
   ProjectPayload,
   Provider,
   ProviderPayload,
-  WorkspaceFile,
 } from '@/types/agent'
 
 function createId(prefix: string): string {
@@ -41,11 +39,9 @@ export const useAgentStore = defineStore('agent', {
     projects: [] as Project[],
     conversations: [] as Conversation[],
     messages: [] as ChatMessage[],
-    files: [] as WorkspaceFile[],
     providers: [] as Provider[],
     selectedProjectId: '',
     selectedConversationId: '',
-    selectedFileId: '',
     selectedProviderId: '',
     loading: false,
     sending: false,
@@ -61,9 +57,6 @@ export const useAgentStore = defineStore('agent', {
     },
     selectedProvider(state): Provider | undefined {
       return state.providers.find((provider) => provider.id === state.selectedProviderId)
-    },
-    selectedFile(state): WorkspaceFile | undefined {
-      return state.files.find((file) => file.id === state.selectedFileId)
     },
   },
   actions: {
@@ -93,9 +86,7 @@ export const useAgentStore = defineStore('agent', {
       this.conversations = sortUpdated(
         await getRecordsByIndex('conversations', 'projectId', projectId),
       )
-      this.files = sortCreated(await getRecordsByIndex('files', 'projectId', projectId))
       this.selectedConversationId = this.conversations[0]?.id ?? ''
-      this.selectedFileId = this.files[0]?.id ?? ''
       this.messages = []
 
       if (this.selectedConversationId) {
@@ -125,7 +116,6 @@ export const useAgentStore = defineStore('agent', {
         ),
       )
       await deleteRecordsByIndex('conversations', 'projectId', projectId)
-      await deleteRecordsByIndex('files', 'projectId', projectId)
       await deleteRecord('projects', projectId)
 
       this.projects = this.projects.filter((project) => project.id !== projectId)
@@ -136,9 +126,7 @@ export const useAgentStore = defineStore('agent', {
       } else {
         this.conversations = []
         this.messages = []
-        this.files = []
         this.selectedConversationId = ''
-        this.selectedFileId = ''
       }
     },
     async createConversation(payload: ConversationPayload) {
@@ -173,32 +161,6 @@ export const useAgentStore = defineStore('agent', {
       if (this.selectedConversationId) {
         await this.selectConversation(this.selectedConversationId)
       }
-    },
-    async saveFile(payload: FilePayload) {
-      const timestamp = now()
-      const trimmedPath = payload.path.trim()
-      const selectedFile = this.files.find((file) => file.id === this.selectedFileId)
-      const existing = selectedFile ?? this.files.find((file) => file.path === trimmedPath)
-      const file: WorkspaceFile = {
-        id: existing?.id ?? createId('file'),
-        projectId: payload.projectId,
-        path: trimmedPath,
-        content: payload.content,
-        createdAt: existing?.createdAt ?? timestamp,
-        updatedAt: timestamp,
-      }
-
-      await putRecord('files', file)
-      this.files = sortCreated([...this.files.filter((item) => item.id !== file.id), file])
-      this.selectedFileId = file.id
-    },
-    async selectFile(fileId: string) {
-      this.selectedFileId = fileId
-    },
-    async deleteFile(fileId: string) {
-      await deleteRecord('files', fileId)
-      this.files = this.files.filter((file) => file.id !== fileId)
-      this.selectedFileId = this.files[0]?.id ?? ''
     },
     async saveProvider(payload: ProviderPayload, providerId?: string) {
       const timestamp = now()
@@ -248,14 +210,15 @@ export const useAgentStore = defineStore('agent', {
           provider: this.selectedProvider,
           systemPrompt,
           messages: this.messages,
-          files: this.files,
         })
+        const responseEndedAt = now()
         const assistantMessage: ChatMessage = {
           id: createId('message'),
           conversationId: this.selectedConversationId,
           role: 'assistant',
           content: response,
-          createdAt: now(),
+          createdAt: responseEndedAt,
+          responseDurationMs: responseEndedAt - userMessage.createdAt,
         }
 
         await putRecord('messages', assistantMessage)

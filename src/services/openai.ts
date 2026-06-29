@@ -1,4 +1,4 @@
-import type { ChatMessage, Provider, WorkspaceFile } from '@/types/agent'
+import type { ChatMessage, Provider } from '@/types/agent'
 
 interface OpenAIMessage {
   role: 'system' | 'user' | 'assistant'
@@ -22,29 +22,15 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '')
 }
 
-function buildFileContext(files: WorkspaceFile[]): string {
-  if (files.length === 0) {
-    return ''
-  }
-
-  return files
-    .map((file) => `File: ${file.path}\n\`\`\`\n${file.content}\n\`\`\``)
-    .join('\n\n')
-}
-
 export async function requestChatCompletion(params: {
   provider: Provider
   systemPrompt: string
   messages: ChatMessage[]
-  files: WorkspaceFile[]
 }): Promise<string> {
-  const fileContext = buildFileContext(params.files)
   const messages: OpenAIMessage[] = [
     {
       role: 'system',
-      content: fileContext
-        ? `${params.systemPrompt}\n\nCurrent project files:\n\n${fileContext}`
-        : params.systemPrompt,
+      content: params.systemPrompt,
     },
     ...params.messages.map((message) => ({
       role: message.role,
