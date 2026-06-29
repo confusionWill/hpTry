@@ -154,6 +154,8 @@ src/styles
 
 避免大量内联 style。
 
+使用现代CSS标准语法，不要主动添加CSS兼容。
+
 ---
 
 ## 组件规范
@@ -209,26 +211,6 @@ settings.ts
 如果代码有迁移、兼容的行为，必须先和我确认再做。
 
 删除或修改功能时，同步清理不再使用的代码和资源。不要留下死代码或无引用资源。
-
----
-
-## 提交前检查
-
-执行：
-
-```bash
-npm run typecheck
-
-npm run lint
-
-npm run build
-```
-
-确保：
-
-* 无 TypeScript 错误
-* 无 ESLint 错误
-* 项目能够正常构建
 
 ---
 

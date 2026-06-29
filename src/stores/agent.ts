@@ -18,6 +18,8 @@ import type {
   ProviderPayload,
 } from '@/types/agent'
 
+const SELECTED_PROVIDER_STORAGE_KEY = 'browser-agent:selected-provider-id'
+
 function createId(prefix: string): string {
   return `${prefix}_${crypto.randomUUID()}`
 }
@@ -32,6 +34,19 @@ function sortUpdated<T extends { updatedAt: number }>(records: T[]): T[] {
 
 function sortCreated<T extends { createdAt: number }>(records: T[]): T[] {
   return [...records].sort((a, b) => a.createdAt - b.createdAt)
+}
+
+function loadSelectedProviderId(): string {
+  return localStorage.getItem(SELECTED_PROVIDER_STORAGE_KEY) ?? ''
+}
+
+function saveSelectedProviderId(providerId: string): void {
+  if (providerId) {
+    localStorage.setItem(SELECTED_PROVIDER_STORAGE_KEY, providerId)
+    return
+  }
+
+  localStorage.removeItem(SELECTED_PROVIDER_STORAGE_KEY)
 }
 
 export const useAgentStore = defineStore('agent', {
@@ -70,8 +85,10 @@ export const useAgentStore = defineStore('agent', {
           this.selectedProjectId = this.projects[0].id
         }
 
-        if (!this.selectedProviderId && this.providers[0]) {
-          this.selectedProviderId = this.providers[0].id
+        if (!this.selectedProviderId) {
+          const savedProviderId = loadSelectedProviderId()
+          const provider = this.providers.find((item) => item.id === savedProviderId)
+          this.selectProvider(provider?.id ?? this.providers[0]?.id ?? '')
         }
 
         if (this.selectedProjectId) {
@@ -149,6 +166,10 @@ export const useAgentStore = defineStore('agent', {
         await getRecordsByIndex('messages', 'conversationId', conversationId),
       )
     },
+    selectProvider(providerId: string) {
+      this.selectedProviderId = providerId
+      saveSelectedProviderId(providerId)
+    },
     async deleteConversation(conversationId: string) {
       await deleteRecordsByIndex('messages', 'conversationId', conversationId)
       await deleteRecord('conversations', conversationId)
@@ -180,12 +201,12 @@ export const useAgentStore = defineStore('agent', {
         ...this.providers.filter((item) => item.id !== provider.id),
         provider,
       ])
-      this.selectedProviderId = provider.id
+      this.selectProvider(provider.id)
     },
     async deleteProvider(providerId: string) {
       await deleteRecord('providers', providerId)
       this.providers = this.providers.filter((provider) => provider.id !== providerId)
-      this.selectedProviderId = this.providers[0]?.id ?? ''
+      this.selectProvider(this.providers[0]?.id ?? '')
     },
     async sendMessage(content: string, systemPrompt: string) {
       if (!this.selectedConversationId || !this.selectedProvider) {

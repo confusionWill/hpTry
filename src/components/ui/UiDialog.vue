@@ -14,11 +14,12 @@
           :aria-label="title || ariaLabel"
           :style="{ width }"
         >
-          <header v-if="title || ariaLabel || $slots.header" class="ui-dialog__header">
+          <header v-if="showHeader && (title || $slots.header)" class="ui-dialog__header">
             <slot name="header">
               <h2>{{ title }}</h2>
             </slot>
             <button
+              v-if="showClose"
               class="ui-dialog__close"
               :aria-label="closeLabel"
               type="button"
@@ -51,12 +52,16 @@ withDefaults(
     ariaLabel?: string
     width?: string
     closeLabel?: string
+    showHeader?: boolean
+    showClose?: boolean
   }>(),
   {
     title: '',
     ariaLabel: '',
     width: '420px',
     closeLabel: 'Close',
+    showHeader: false,
+    showClose: false,
   },
 )
 
@@ -85,8 +90,17 @@ watch(
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(15, 23, 42, 0.42);
+  background: rgba(248, 250, 252, 0.52);
+  backdrop-filter: blur(20px) saturate(140%);
   padding: 24px;
+  transition:
+    background 0.5s ease,
+    backdrop-filter 0.5s ease;
+}
+
+.ui-dialog__overlay:hover:not(:has(.ui-dialog:hover)) {
+  background: rgba(248, 250, 252, 0.2);
+  backdrop-filter: blur(5px) saturate(120%);
 }
 
 .ui-dialog {
@@ -94,10 +108,11 @@ watch(
   max-height: min(86vh, 760px);
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--ui-border-color-light);
   border-radius: 8px;
   background: var(--ui-bg-color);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  box-shadow: 
+    inset 0 0 5px rgba(0, 0, 0, 0.05),
+    0 0 10px rgba(15, 23, 42, 0.14);
   overflow: hidden;
 }
 

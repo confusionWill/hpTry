@@ -2,8 +2,6 @@
   <UiDialog
     v-model="visible"
     :aria-label="t('common.settings')"
-    :close-label="t('common.close')"
-    :title="t('common.settings')"
     width="50vw"
     @closed="resetForm"
   >
@@ -20,7 +18,7 @@
           <button
             class="provider-select"
             type="button"
-            @click="store.selectedProviderId = provider.id"
+            @click="store.selectProvider(provider.id)"
           >
             <span>{{ provider.name }}</span>
           </button>
@@ -139,7 +137,7 @@ function editProvider(providerId: string) {
     return
   }
 
-  store.selectedProviderId = provider.id
+  store.selectProvider(provider.id)
   editingProviderId.value = provider.id
   form.name = provider.name
   form.baseUrl = provider.baseUrl
@@ -206,10 +204,10 @@ async function confirmDeleteProvider() {
   width: 100px;
   height: 100px;
   place-items: center;
-  border: 1px solid var(--ui-border-color);
+  border: 0;
   border-radius: 50%;
-  background: var(--ui-fill-color-light);
-  color: var(--ui-text-color-primary);
+  background: rgba(241, 245, 249, 0.54);
+  color: var(--ui-text-color-secondary);
   cursor: pointer;
   font: inherit;
   line-height: 1.2;
@@ -234,7 +232,6 @@ async function confirmDeleteProvider() {
 
 .provider-circle:hover,
 .provider-circle--active {
-  border-color: var(--ui-color-primary);
   background: var(--ui-color-primary-light-9);
   color: var(--ui-color-primary);
 }
