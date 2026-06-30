@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "浏览器 Agent"
+    "title": "hpWill"
   },
   "common": {
     "cancel": "取消",
@@ -24,6 +24,7 @@
     "selectPlaceholder": "选择项目",
     "namePlaceholder": "项目名称",
     "descriptionPlaceholder": "项目描述",
+    "running": "运行中",
     "emptyTitle": "先创建项目",
     "emptyDescription": "创建项目后才能开始会话。"
   },
@@ -54,6 +55,23 @@
     "missing": "请先选择供应商。"
   },
   "agent": {
-    "systemPrompt": "你是一个运行在浏览器内的编程助手。根据用户问题和当前会话上下文回答。"
+    "emptyFinalMessage": "工具调用已完成，但模型没有返回总结。请查看右侧工作区文件。"
+  },
+  "workspace": {
+    "title": "工作区",
+    "fileCount": "{count} 个文件",
+    "files": "文件",
+    "preview": "内容",
+    "toolRuns": "工具调用",
+    "emptyFiles": "暂无文件",
+    "emptyPreview": "选择一个文件查看内容",
+    "emptyToolRuns": "暂无工具调用",
+    "exportZip": "导出 ZIP",
+    "exportFailed": "导出失败",
+    "toolStatus": {
+      "running": "运行中",
+      "success": "成功",
+      "error": "失败"
+    }
   }
 }

@@ -2,59 +2,65 @@
   <section class="chat-panel">
     <div class="chat-panel__header">
       <div>
-        <h1>{{ store.selectedConversation?.title ?? t('conversation.selectEmpty') }}</h1>
+        <h1>{{ conversationTitle }}</h1>
         <p v-if="store.selectedProject">
           {{ store.selectedProject.name }}
         </p>
       </div>
     </div>
 
-    <div v-if="!store.selectedConversationId" class="empty-state">
+    <div v-if="!canChat" class="empty-state">
       <UiEmpty :description="t('conversation.selectEmpty')" />
     </div>
 
     <template v-else>
-      <div class="messages">
-        <article
-          v-for="message in store.messages"
-          :key="message.id"
-          class="message"
-          :class="`message--${message.role}`"
-        >
-          <p>{{ message.content }}</p>
-          <span
-            v-if="message.role === 'assistant' && message.responseDurationMs !== undefined"
-            class="message__answer-duration"
-          >
-            {{
-              t('conversation.answerDuration', {
-                duration: formatAnswerDuration(message.responseDurationMs),
-              })
-            }}
-          </span>
-        </article>
-      </div>
+      <div class="chat-panel__body">
+        <div class="chat-panel__conversation">
+          <div class="messages">
+            <article
+              v-for="message in store.messages"
+              :key="message.id"
+              class="message"
+              :class="`message--${message.role}`"
+            >
+              <p>{{ message.content }}</p>
+              <span
+                v-if="message.role === 'assistant' && message.responseDurationMs !== undefined"
+                class="message__answer-duration"
+              >
+                {{
+                  t('conversation.answerDuration', {
+                    duration: formatAnswerDuration(message.responseDurationMs),
+                  })
+                }}
+              </span>
+            </article>
+          </div>
 
-      <div class="composer">
-        <UiTextarea
-          v-model="draft"
-          autosize
-          :min-rows="2"
-          :max-rows="6"
-          :placeholder="t('conversation.inputPlaceholder')"
-          @keydown.enter.exact.prevent="send"
-        />
-        <UiButton
-          :disabled="!draft.trim() || store.sending"
-          :loading="store.sending"
-          variant="primary"
-          @click="send"
-        >
-          <template #icon>
-            <Send :size="16" />
-          </template>
-          {{ store.sending ? t('conversation.sending') : t('conversation.send') }}
-        </UiButton>
+          <div class="composer">
+            <UiTextarea
+              v-model="draft"
+              autosize
+              :min-rows="2"
+              :max-rows="6"
+              :placeholder="t('conversation.inputPlaceholder')"
+              @keydown.enter.exact.prevent="send"
+            />
+            <UiButton
+              :disabled="!draft.trim() || currentProjectRunning"
+              :loading="currentProjectRunning"
+              variant="primary"
+              @click="send"
+            >
+              <template #icon>
+                <Send :size="16" />
+              </template>
+              {{ currentProjectRunning ? t('conversation.sending') : t('conversation.send') }}
+            </UiButton>
+          </div>
+        </div>
+
+        <WorkspacePanel />
       </div>
     </template>
   </section>
@@ -62,12 +68,14 @@
 
 <script setup lang="ts">
 import { Send } from '@lucide/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import UiTextarea from '@/components/ui/UiTextarea.vue'
+import WorkspacePanel from '@/components/WorkspacePanel.vue'
+import { AGENT_SYSTEM_PROMPT, CONVERSATION_TITLE_PROMPT } from '@/services/agent/prompts'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 
@@ -75,6 +83,20 @@ const store = useAgentStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
 const draft = ref('')
+
+const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
+const currentProjectRunning = computed(() => store.isSelectedProjectRunning)
+const conversationTitle = computed(() => {
+  if (store.selectedConversation) {
+    return store.selectedConversation.title
+  }
+
+  if (store.isDraftConversationActive) {
+    return t('conversation.new')
+  }
+
+  return t('conversation.selectEmpty')
+})
 
 function formatAnswerDuration(durationMs: number): string {
   if (durationMs < 1000) {
@@ -87,7 +109,7 @@ function formatAnswerDuration(durationMs: number): string {
 async function send() {
   const content = draft.value.trim()
 
-  if (!content || store.sending) {
+  if (!content || currentProjectRunning.value) {
     return
   }
 
@@ -99,7 +121,13 @@ async function send() {
   draft.value = ''
 
   try {
-    await store.sendMessage(content, t('agent.systemPrompt'))
+    await store.sendMessage(
+      content,
+      AGENT_SYSTEM_PROMPT,
+      t('agent.emptyFinalMessage'),
+      CONVERSATION_TITLE_PROMPT,
+      t('conversation.new'),
+    )
   } catch (error) {
     const message = error instanceof Error ? error.message : t('provider.requestFailed')
     uiStore.showToast(message || t('provider.requestFailed'), 'error')
@@ -144,6 +172,21 @@ async function send() {
   min-height: 0;
   flex: 1;
   place-items: center;
+}
+
+.chat-panel__body {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+}
+
+.chat-panel__conversation {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
 .messages {
@@ -191,5 +234,11 @@ async function send() {
   border-top: 1px solid var(--ui-border-color-light);
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 14px 18px;
+}
+
+@media (max-width: 1180px) {
+  .chat-panel__body {
+    min-width: 980px;
+  }
 }
 </style>

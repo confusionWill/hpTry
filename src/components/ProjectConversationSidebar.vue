@@ -42,7 +42,7 @@
         <UiButton
           :disabled="!store.selectedProjectId"
           circle
-          @click="conversationDialogVisible = true"
+          @click="store.startDraftConversation()"
         >
           <template #icon>
             <MessageCircle :size="17" />
@@ -51,34 +51,85 @@
       </div>
 
       <UiEmpty
-        v-if="store.conversations.length === 0"
+        v-if="store.conversations.length === 0 && !store.isDraftConversationActive"
         :description="t('conversation.empty')"
         :image-size="80"
       />
 
       <div v-else class="conversation-list">
         <div
+          v-if="store.isDraftConversationActive"
+          class="conversation-item conversation-item--active"
+        >
+          <button class="conversation-item__select" type="button">
+            <span>{{ t('conversation.new') }}</span>
+          </button>
+        </div>
+        <div
           v-for="conversation in store.conversations"
           :key="conversation.id"
           class="conversation-item"
           :class="{ 'conversation-item--active': conversation.id === store.selectedConversationId }"
         >
+          <UiInput
+            v-if="editingConversationId === conversation.id"
+            v-model="editingConversationTitle"
+            class="conversation-item__input"
+            :placeholder="t('conversation.namePlaceholder')"
+            @keydown.enter.exact.prevent="saveConversationTitle(conversation.id)"
+            @keydown.esc.prevent="cancelEditingConversation"
+          />
           <button
+            v-else
             class="conversation-item__select"
             type="button"
             @click="store.selectConversation(conversation.id)"
           >
             <span>{{ conversation.title }}</span>
           </button>
-          <UiButton
-            :aria-label="t('common.delete')"
-            text
-            @click="confirmDeleteConversation(conversation.id)"
-          >
-            <template #icon>
-              <Trash2 :size="16" />
+          <div class="conversation-item__actions">
+            <template v-if="editingConversationId === conversation.id">
+              <UiButton
+                :aria-label="t('common.save')"
+                text
+                @click="saveConversationTitle(conversation.id)"
+              >
+                <template #icon>
+                  <Check :size="16" />
+                </template>
+              </UiButton>
+              <UiButton
+                :aria-label="t('common.cancel')"
+                text
+                @click="cancelEditingConversation"
+              >
+                <template #icon>
+                  <X :size="16" />
+                </template>
+              </UiButton>
             </template>
-          </UiButton>
+            <template v-else>
+              <UiButton
+                :aria-label="t('common.edit')"
+                text
+                @click="startEditingConversation(conversation.id, conversation.title)"
+              >
+                <template #icon>
+                  <Pencil :size="16" />
+                </template>
+              </UiButton>
+              <UiButton
+                :aria-label="t('common.delete')"
+                :disabled="store.isConversationRunning(conversation.id)"
+                text
+                @click="confirmDeleteConversation(conversation.id)"
+              >
+                <template #icon>
+                  <Trash2 :size="16" />
+                </template>
+              </UiButton>
+            </template>
+          </div>
         </div>
       </div>
     </div>
@@ -109,39 +160,11 @@
         </UiButton>
       </template>
     </UiDialog>
-
-    <UiDialog
-      v-model="conversationDialogVisible"
-      :close-label="t('common.close')"
-      :title="t('conversation.new')"
-      width="420px"
-    >
-      <form @submit.prevent="createConversation">
-        <UiFormItem :label="t('common.name')" required>
-          <UiInput
-            v-model="conversationTitle"
-            :placeholder="t('conversation.namePlaceholder')"
-          />
-        </UiFormItem>
-      </form>
-      <template #footer>
-        <UiButton @click="conversationDialogVisible = false">
-          {{ t('common.cancel') }}
-        </UiButton>
-        <UiButton
-          :disabled="!conversationTitle.trim()"
-          variant="primary"
-          @click="createConversation"
-        >
-          {{ t('common.create') }}
-        </UiButton>
-      </template>
-    </UiDialog>
   </aside>
 </template>
 
 <script setup lang="ts">
-import { MessageCircle, Plus, Settings, Trash2 } from '@lucide/vue'
+import { Check, MessageCircle, Pencil, Plus, Settings, Trash2, X } from '@lucide/vue'
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -164,8 +187,8 @@ const uiStore = useUiStore()
 const { t } = useI18n()
 
 const projectDialogVisible = ref(false)
-const conversationDialogVisible = ref(false)
-const conversationTitle = ref('')
+const editingConversationId = ref('')
+const editingConversationTitle = ref('')
 const projectForm = reactive({
   name: '',
   description: '',
@@ -173,7 +196,9 @@ const projectForm = reactive({
 
 const projectOptions = computed<UiSelectOption[]>(() =>
   store.projects.map((project) => ({
-    label: project.name,
+    label: store.isProjectRunning(project.id)
+      ? `${project.name} · ${t('project.running')}`
+      : project.name,
     value: project.id,
   })),
 )
@@ -199,17 +224,23 @@ async function createProject() {
   projectDialogVisible.value = false
 }
 
-async function createConversation() {
-  if (!store.selectedProjectId) {
+function startEditingConversation(conversationId: string, title: string) {
+  editingConversationId.value = conversationId
+  editingConversationTitle.value = title
+}
+
+function cancelEditingConversation() {
+  editingConversationId.value = ''
+  editingConversationTitle.value = ''
+}
+
+async function saveConversationTitle(conversationId: string) {
+  if (!editingConversationTitle.value.trim()) {
     return
   }
 
-  await store.createConversation({
-    projectId: store.selectedProjectId,
-    title: conversationTitle.value,
-  })
-  conversationTitle.value = ''
-  conversationDialogVisible.value = false
+  await store.updateConversationTitle(conversationId, editingConversationTitle.value)
+  cancelEditingConversation()
 }
 
 async function confirmDeleteConversation(conversationId: string) {
@@ -303,6 +334,10 @@ async function confirmDeleteConversation(conversationId: string) {
   text-align: left;
 }
 
+.conversation-item__input {
+  min-width: 0;
+}
+
 .conversation-item__select {
   min-width: 0;
   height: 100%;
@@ -320,6 +355,11 @@ async function confirmDeleteConversation(conversationId: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.conversation-item__actions {
+  display: flex;
+  align-items: center;
 }
 
 .conversation-item:hover,

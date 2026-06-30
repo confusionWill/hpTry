@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "Browser Agent"
+    "title": "hpWill"
   },
   "common": {
     "cancel": "Cancel",
@@ -24,6 +24,7 @@
     "selectPlaceholder": "Select project",
     "namePlaceholder": "Project name",
     "descriptionPlaceholder": "Project description",
+    "running": "Running",
     "emptyTitle": "Create a project first",
     "emptyDescription": "Create a project before starting conversations."
   },
@@ -54,6 +55,23 @@
     "missing": "Select a provider first."
   },
   "agent": {
-    "systemPrompt": "You are a coding assistant running in the browser. Answer using the user request and current conversation context."
+    "emptyFinalMessage": "Tool calls completed, but the model did not return a summary. Check the workspace files on the right."
+  },
+  "workspace": {
+    "title": "Workspace",
+    "fileCount": "{count} files",
+    "files": "Files",
+    "preview": "Content",
+    "toolRuns": "Tool calls",
+    "emptyFiles": "No files yet",
+    "emptyPreview": "Select a file to view content",
+    "emptyToolRuns": "No tool calls yet",
+    "exportZip": "Export ZIP",
+    "exportFailed": "Export failed",
+    "toolStatus": {
+      "running": "Running",
+      "success": "Success",
+      "error": "Failed"
+    }
   }
 }

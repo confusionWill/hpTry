@@ -1,4 +1,5 @@
 export type MessageRole = 'system' | 'user' | 'assistant'
+export type ToolRunStatus = 'running' | 'success' | 'error'
 
 export interface Project {
   id: string
@@ -42,12 +43,41 @@ export interface ProviderPayload {
   model: string
 }
 
+export interface WorkspaceFile {
+  id: string
+  projectId: string
+  path: string
+  content: string
+  language: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ToolRun {
+  id: string
+  conversationId: string
+  toolCallId: string
+  toolName: string
+  status: ToolRunStatus
+  input: string
+  output: string
+  error: string
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ToolFunctionCall {
+  name: string
+  arguments: string
+}
+
+export interface ToolCall {
+  id: string
+  type: 'function'
+  function: ToolFunctionCall
+}
+
 export interface ProjectPayload {
   name: string
   description: string
-}
-
-export interface ConversationPayload {
-  projectId: string
-  title: string
 }

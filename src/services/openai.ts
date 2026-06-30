@@ -1,14 +1,25 @@
-import type { ChatMessage, Provider } from '@/types/agent'
+import type { ChatTool } from '@/services/agent/tools'
+import type { Provider, ToolCall } from '@/types/agent'
 
-interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant'
-  content: string
+export interface ChatMessageParam {
+  role: 'system' | 'user' | 'assistant' | 'tool'
+  content: string | null
+  tool_calls?: ToolCall[]
+  tool_call_id?: string
+}
+
+export interface ChatCompletionMessage {
+  role: 'assistant'
+  content?: string | null
+  tool_calls?: ToolCall[]
+}
+
+export interface ChatCompletionResult {
+  message: ChatCompletionMessage
 }
 
 interface ChatCompletionChoice {
-  message?: {
-    content?: string
-  }
+  message?: ChatCompletionMessage
 }
 
 interface ChatCompletionResponse {
@@ -24,20 +35,10 @@ function normalizeBaseUrl(baseUrl: string): string {
 
 export async function requestChatCompletion(params: {
   provider: Provider
-  systemPrompt: string
-  messages: ChatMessage[]
-}): Promise<string> {
-  const messages: OpenAIMessage[] = [
-    {
-      role: 'system',
-      content: params.systemPrompt,
-    },
-    ...params.messages.map((message) => ({
-      role: message.role,
-      content: message.content,
-    })),
-  ]
-
+  messages: ChatMessageParam[]
+  tools?: ChatTool[]
+  toolChoice?: 'auto' | 'none'
+}): Promise<ChatCompletionResult> {
   const response = await fetch(`${normalizeBaseUrl(params.provider.baseUrl)}/chat/completions`, {
     method: 'POST',
     headers: {
@@ -46,7 +47,9 @@ export async function requestChatCompletion(params: {
     },
     body: JSON.stringify({
       model: params.provider.model,
-      messages,
+      messages: params.messages,
+      tools: params.tools,
+      tool_choice: params.tools ? (params.toolChoice ?? 'auto') : undefined,
       temperature: 0.2,
     }),
   })
@@ -57,11 +60,11 @@ export async function requestChatCompletion(params: {
     throw new Error(payload.error?.message ?? response.statusText)
   }
 
-  const content = payload.choices?.[0]?.message?.content?.trim()
+  const message = payload.choices?.[0]?.message
 
-  if (!content) {
+  if (!message) {
     throw new Error('Empty response')
   }
 
-  return content
+  return { message }
 }
