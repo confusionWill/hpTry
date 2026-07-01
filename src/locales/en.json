@@ -68,6 +68,11 @@
     "emptyToolRuns": "No tool calls yet",
     "exportZip": "Export ZIP",
     "exportFailed": "Export failed",
+    "previewDialog": {
+      "ariaLabel": "File preview",
+      "unavailable": "Unable to preview this file content",
+      "unsupported": "Preview is not supported for this file type"
+    },
     "toolStatus": {
       "running": "Running",
       "success": "Success",

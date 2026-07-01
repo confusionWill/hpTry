@@ -50,7 +50,7 @@ export async function requestChatCompletion(params: {
       messages: params.messages,
       tools: params.tools,
       tool_choice: params.tools ? (params.toolChoice ?? 'auto') : undefined,
-      temperature: 0.2,
+      // temperature: 0.2,
     }),
   })
 

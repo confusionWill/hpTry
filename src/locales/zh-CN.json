@@ -68,6 +68,11 @@
     "emptyToolRuns": "暂无工具调用",
     "exportZip": "导出 ZIP",
     "exportFailed": "导出失败",
+    "previewDialog": {
+      "ariaLabel": "文件预览",
+      "unavailable": "无法预览该文件内容",
+      "unsupported": "暂不支持预览该文件类型"
+    },
     "toolStatus": {
       "running": "运行中",
       "success": "成功",

@@ -40,11 +40,6 @@ interface ActiveAgentRun {
   conversationId: string
 }
 
-const WORKSPACE_TOOL_INTENT_PATTERNS = [
-  /创建|生成|实现|开发|搭建|写(一个|个|下|出|入|代码|文件)?|做(一个|个)?|修改|更改|改成|修复|删除|重命名|查看|读取|检查|分析|审查|优化|重构|预览|导出/,
-  /\b(create|generate|build|implement|make|write|modify|change|fix|delete|rename|read|view|inspect|check|analyze|review|optimize|refactor|preview|export)\b/i,
-]
-
 function loadSelectedProviderId(): string {
   return localStorage.getItem(SELECTED_PROVIDER_STORAGE_KEY) ?? ''
 }
@@ -56,10 +51,6 @@ function saveSelectedProviderId(providerId: string): void {
   }
 
   localStorage.removeItem(SELECTED_PROVIDER_STORAGE_KEY)
-}
-
-function shouldAllowWorkspaceTools(message: string): boolean {
-  return WORKSPACE_TOOL_INTENT_PATTERNS.some((pattern) => pattern.test(message))
 }
 
 export const useAgentStore = defineStore('agent', {
@@ -79,6 +70,7 @@ export const useAgentStore = defineStore('agent', {
     exportingZip: false,
     activeRuns: [] as ActiveAgentRun[],
     projectLoadToken: 0,
+    conversationLoadToken: 0,
   }),
   getters: {
     selectedProject(state): Project | undefined {
@@ -163,6 +155,8 @@ export const useAgentStore = defineStore('agent', {
       this.selectedConversationId = this.conversations[0]?.id ?? ''
       this.draftConversationProjectId = ''
       this.messages = []
+      this.toolRuns = []
+      this.conversationLoadToken += 1
       await this.loadWorkspaceFiles(projectId, loadToken)
 
       if (this.projectLoadToken !== loadToken) {
@@ -196,10 +190,8 @@ export const useAgentStore = defineStore('agent', {
         this.selectedWorkspaceFilePath = this.workspaceFiles[0]?.path ?? ''
       }
     },
-    async loadToolRuns(conversationId: string) {
-      this.toolRuns = sortCreated(
-        await getRecordsByIndex('toolRuns', 'conversationId', conversationId),
-      )
+    async loadToolRuns(conversationId: string): Promise<ToolRun[]> {
+      return sortCreated(await getRecordsByIndex('toolRuns', 'conversationId', conversationId))
     },
     async createProject(payload: ProjectPayload) {
       const timestamp = now()
@@ -256,8 +248,11 @@ export const useAgentStore = defineStore('agent', {
       this.selectedConversationId = ''
       this.messages = []
       this.toolRuns = []
+      this.conversationLoadToken += 1
     },
     async selectConversation(conversationId: string) {
+      const loadToken = this.conversationLoadToken + 1
+      const projectId = this.selectedProjectId
       const conversation = this.conversations.find((item) => item.id === conversationId)
 
       if (!conversation) {
@@ -270,10 +265,25 @@ export const useAgentStore = defineStore('agent', {
 
       this.selectedConversationId = conversationId
       this.draftConversationProjectId = ''
-      this.messages = sortCreated(
-        await getRecordsByIndex('messages', 'conversationId', conversationId),
-      )
-      await this.loadToolRuns(conversationId)
+      this.messages = []
+      this.toolRuns = []
+      this.conversationLoadToken = loadToken
+
+      const [messages, toolRuns] = await Promise.all([
+        getRecordsByIndex('messages', 'conversationId', conversationId),
+        this.loadToolRuns(conversationId),
+      ])
+
+      if (
+        this.conversationLoadToken !== loadToken ||
+        this.selectedProjectId !== projectId ||
+        this.selectedConversationId !== conversationId
+      ) {
+        return
+      }
+
+      this.messages = sortCreated(messages)
+      this.toolRuns = toolRuns
     },
     selectProvider(providerId: string) {
       this.selectedProviderId = providerId
@@ -296,6 +306,7 @@ export const useAgentStore = defineStore('agent', {
       this.selectedConversationId = this.conversations[0]?.id ?? ''
       this.messages = []
       this.toolRuns = []
+      this.conversationLoadToken += 1
 
       if (this.selectedConversationId) {
         await this.selectConversation(this.selectedConversationId)
@@ -540,7 +551,6 @@ export const useAgentStore = defineStore('agent', {
           systemPrompt,
           messages: runMessages,
           runContext,
-          allowTools: shouldAllowWorkspaceTools(content),
           handlers: {
             createToolRun: (toolCall) =>
               this.createToolRun(runConversation.id, runContext.toolRuns, toolCall),

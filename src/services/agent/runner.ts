@@ -105,7 +105,6 @@ export async function runAgentConversation(params: {
   messages: ChatMessage[]
   runContext: AgentRunContext
   handlers: AgentRunHandlers
-  allowTools: boolean
 }): Promise<string> {
   const agentMessages = toChatMessages(params.systemPrompt, params.messages)
 
@@ -113,8 +112,8 @@ export async function runAgentConversation(params: {
     const response = await requestChatCompletion({
       provider: params.runContext.provider,
       messages: agentMessages,
-      tools: params.allowTools ? hpWillTools : undefined,
-      toolChoice: params.allowTools ? 'auto' : 'none',
+      tools: hpWillTools,
+      toolChoice: 'auto',
     })
     const toolCalls = response.message.tool_calls ?? []
 

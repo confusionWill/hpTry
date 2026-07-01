@@ -26,38 +26,12 @@
         :description="t('workspace.emptyFiles')"
         :image-size="52"
       />
-      <div v-else class="file-list">
-        <button
-          v-for="file in store.workspaceFiles"
-          :key="file.id"
-          class="file-list__item"
-          :class="{ 'file-list__item--active': file.path === store.selectedWorkspaceFilePath }"
-          :style="{ paddingLeft: `${12 + fileDepth(file.path) * 14}px` }"
-          type="button"
-          @click="store.selectWorkspaceFile(file.path)"
-        >
-          <FileText :size="15" />
-          <span>{{ fileName(file.path) }}</span>
-        </button>
-      </div>
-    </section>
-
-    <section class="workspace-panel__preview">
-      <div class="workspace-panel__section-title">
-        {{ t('workspace.preview') }}
-      </div>
-      <UiEmpty
-        v-if="!store.selectedWorkspaceFile"
-        :description="t('workspace.emptyPreview')"
-        :image-size="52"
+      <WorkspaceFileTree
+        v-else
+        :files="store.workspaceFiles"
+        :selected-path="store.selectedWorkspaceFilePath"
+        @select="previewWorkspaceFile"
       />
-      <article v-else class="file-preview">
-        <div class="file-preview__meta">
-          <span>{{ store.selectedWorkspaceFile.path }}</span>
-          <small>{{ store.selectedWorkspaceFile.language }}</small>
-        </div>
-        <pre><code>{{ store.selectedWorkspaceFile.content }}</code></pre>
-      </article>
     </section>
 
     <section class="workspace-panel__tools">
@@ -84,16 +58,23 @@
         </article>
       </div>
     </section>
+
+    <WorkspaceFilePreviewDialog
+      v-model="previewVisible"
+      :file="store.selectedWorkspaceFile"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
-import { Download, FileText } from '@lucide/vue'
-import { computed } from 'vue'
+import { Download } from '@lucide/vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
+import WorkspaceFilePreviewDialog from '@/components/WorkspaceFilePreviewDialog.vue'
+import WorkspaceFileTree from '@/components/WorkspaceFileTree.vue'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 import type { ToolRun } from '@/types/agent'
@@ -102,14 +83,12 @@ const store = useAgentStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
 
+const previewVisible = ref(false)
 const visibleToolRuns = computed(() => store.toolRuns.slice(-10).reverse())
 
-function fileDepth(path: string): number {
-  return Math.max(path.split('/').length - 1, 0)
-}
-
-function fileName(path: string): string {
-  return path.split('/').pop() ?? path
+function previewWorkspaceFile(path: string) {
+  store.selectWorkspaceFile(path)
+  previewVisible.value = true
 }
 
 function summarizeRun(run: ToolRun): string {
@@ -168,7 +147,6 @@ async function exportZip() {
 }
 
 .workspace-panel__files,
-.workspace-panel__preview,
 .workspace-panel__tools {
   display: flex;
   min-height: 0;
@@ -179,10 +157,6 @@ async function exportZip() {
 }
 
 .workspace-panel__files {
-  flex: 0 0 210px;
-}
-
-.workspace-panel__preview {
   flex: 1 1 auto;
 }
 
@@ -197,85 +171,9 @@ async function exportZip() {
   font-weight: 650;
 }
 
-.file-list,
 .tool-list {
   min-height: 0;
   overflow: auto;
-}
-
-.file-list__item {
-  display: flex;
-  width: 100%;
-  height: 32px;
-  align-items: center;
-  gap: 8px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: var(--ui-text-color-primary);
-  cursor: pointer;
-  font-size: 13px;
-  text-align: left;
-}
-
-.file-list__item:hover,
-.file-list__item--active {
-  background: var(--ui-fill-color-light);
-}
-
-.file-list__item span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-preview {
-  display: flex;
-  min-height: 0;
-  flex: 1;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-}
-
-.file-preview__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid var(--ui-border-color-light);
-  background: var(--ui-fill-color-light);
-  padding: 8px 10px;
-}
-
-.file-preview__meta span {
-  min-width: 0;
-  overflow: hidden;
-  font-size: 12px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-preview__meta small {
-  color: var(--ui-text-color-secondary);
-}
-
-.file-preview pre {
-  min-height: 0;
-  flex: 1;
-  margin: 0;
-  overflow: auto;
-  padding: 12px;
-}
-
-.file-preview code {
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre;
 }
 
 .tool-list {
