@@ -33,6 +33,7 @@ import type {
 } from '@/types/agent'
 import { createId, now, sortCreated, sortUpdated } from '@/utils/records'
 
+const SELECTED_PROJECT_STORAGE_KEY = 'hpWill:selected-project-id'
 const SELECTED_PROVIDER_STORAGE_KEY = 'hpWill:selected-provider-id'
 
 interface ActiveAgentRun {
@@ -42,6 +43,19 @@ interface ActiveAgentRun {
 
 function loadSelectedProviderId(): string {
   return localStorage.getItem(SELECTED_PROVIDER_STORAGE_KEY) ?? ''
+}
+
+function loadSelectedProjectId(): string {
+  return localStorage.getItem(SELECTED_PROJECT_STORAGE_KEY) ?? ''
+}
+
+function saveSelectedProjectId(projectId: string): void {
+  if (projectId) {
+    localStorage.setItem(SELECTED_PROJECT_STORAGE_KEY, projectId)
+    return
+  }
+
+  localStorage.removeItem(SELECTED_PROJECT_STORAGE_KEY)
 }
 
 function saveSelectedProviderId(providerId: string): void {
@@ -122,7 +136,9 @@ export const useAgentStore = defineStore('agent', {
         this.providers = sortUpdated(await getAllRecords('providers'))
 
         if (!this.selectedProjectId && this.projects[0]) {
-          this.selectedProjectId = this.projects[0].id
+          const savedProjectId = loadSelectedProjectId()
+          const project = this.projects.find((item) => item.id === savedProjectId)
+          this.selectedProjectId = project?.id ?? this.projects[0].id
         }
 
         if (!this.selectedProviderId) {
@@ -143,6 +159,7 @@ export const useAgentStore = defineStore('agent', {
 
       this.projectLoadToken = loadToken
       this.selectedProjectId = projectId
+      saveSelectedProjectId(projectId)
       const conversations = sortUpdated(
         await getRecordsByIndex('conversations', 'projectId', projectId),
       )
@@ -226,6 +243,7 @@ export const useAgentStore = defineStore('agent', {
 
       this.projects = this.projects.filter((project) => project.id !== projectId)
       this.selectedProjectId = this.projects[0]?.id ?? ''
+      saveSelectedProjectId(this.selectedProjectId)
 
       if (this.selectedProjectId) {
         await this.selectProject(this.selectedProjectId)
