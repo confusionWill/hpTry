@@ -23,6 +23,7 @@ import { exportWorkspaceAsZip } from '@/services/agent/workspaceExport'
 import type {
   ChatMessage,
   Conversation,
+  ConversationEvent,
   Project,
   ProjectPayload,
   Provider,
@@ -72,10 +73,9 @@ export const useAgentStore = defineStore('agent', {
   state: () => ({
     projects: [] as Project[],
     conversations: [] as Conversation[],
-    messages: [] as ChatMessage[],
+    events: [] as ConversationEvent[],
     providers: [] as Provider[],
     workspaceFiles: [] as WorkspaceFile[],
-    toolRuns: [] as ToolRun[],
     selectedProjectId: '',
     selectedConversationId: '',
     selectedProviderId: '',
@@ -172,8 +172,7 @@ export const useAgentStore = defineStore('agent', {
       this.conversations = conversations
       this.selectedConversationId = this.conversations[0]?.id ?? ''
       this.draftConversationProjectId = ''
-      this.messages = []
-      this.toolRuns = []
+      this.events = []
       this.conversationLoadToken += 1
       await this.loadWorkspaceFiles(projectId, loadToken)
 
@@ -184,7 +183,7 @@ export const useAgentStore = defineStore('agent', {
       if (this.selectedConversationId) {
         await this.selectConversation(this.selectedConversationId)
       } else {
-        this.toolRuns = []
+        this.events = []
       }
     },
     async loadWorkspaceFiles(projectId: string, loadToken?: number) {
@@ -207,9 +206,6 @@ export const useAgentStore = defineStore('agent', {
       if (!this.selectedWorkspaceFilePath) {
         this.selectedWorkspaceFilePath = this.workspaceFiles[0]?.path ?? ''
       }
-    },
-    async loadToolRuns(conversationId: string): Promise<ToolRun[]> {
-      return sortCreated(await getRecordsByIndex('toolRuns', 'conversationId', conversationId))
     },
     async createProject(payload: ProjectPayload) {
       const timestamp = now()
@@ -234,8 +230,7 @@ export const useAgentStore = defineStore('agent', {
 
       await Promise.all(
         conversations.map(async (conversation) => {
-          await deleteRecordsByIndex('messages', 'conversationId', conversation.id)
-          await deleteRecordsByIndex('toolRuns', 'conversationId', conversation.id)
+          await deleteRecordsByIndex('conversationEvents', 'conversationId', conversation.id)
         }),
       )
       await deleteRecordsByIndex('workspaceFiles', 'projectId', projectId)
@@ -250,9 +245,8 @@ export const useAgentStore = defineStore('agent', {
         await this.selectProject(this.selectedProjectId)
       } else {
         this.conversations = []
-        this.messages = []
+        this.events = []
         this.workspaceFiles = []
-        this.toolRuns = []
         this.selectedConversationId = ''
         this.selectedWorkspaceFilePath = ''
         this.draftConversationProjectId = ''
@@ -281,8 +275,7 @@ export const useAgentStore = defineStore('agent', {
 
       this.draftConversationProjectId = this.selectedProjectId
       this.selectedConversationId = ''
-      this.messages = []
-      this.toolRuns = []
+      this.events = []
       this.conversationLoadToken += 1
     },
     async selectConversation(conversationId: string) {
@@ -300,14 +293,10 @@ export const useAgentStore = defineStore('agent', {
 
       this.selectedConversationId = conversationId
       this.draftConversationProjectId = ''
-      this.messages = []
-      this.toolRuns = []
+      this.events = []
       this.conversationLoadToken = loadToken
 
-      const [messages, toolRuns] = await Promise.all([
-        getRecordsByIndex('messages', 'conversationId', conversationId),
-        this.loadToolRuns(conversationId),
-      ])
+      const events = await getRecordsByIndex('conversationEvents', 'conversationId', conversationId)
 
       if (
         this.conversationLoadToken !== loadToken ||
@@ -317,8 +306,7 @@ export const useAgentStore = defineStore('agent', {
         return
       }
 
-      this.messages = sortCreated(messages)
-      this.toolRuns = toolRuns
+      this.events = sortCreated(events)
     },
     selectProvider(providerId: string) {
       this.selectedProviderId = providerId
@@ -332,15 +320,13 @@ export const useAgentStore = defineStore('agent', {
         throw new Error('Cannot delete a conversation while its agent is running')
       }
 
-      await deleteRecordsByIndex('messages', 'conversationId', conversationId)
-      await deleteRecordsByIndex('toolRuns', 'conversationId', conversationId)
+      await deleteRecordsByIndex('conversationEvents', 'conversationId', conversationId)
       await deleteRecord('conversations', conversationId)
       this.conversations = this.conversations.filter(
         (conversation) => conversation.id !== conversationId,
       )
       this.selectedConversationId = this.conversations[0]?.id ?? ''
-      this.messages = []
-      this.toolRuns = []
+      this.events = []
       this.conversationLoadToken += 1
 
       if (this.selectedConversationId) {
@@ -445,11 +431,16 @@ export const useAgentStore = defineStore('agent', {
 
       return file
     },
-    async createToolRun(conversationId: string, toolRuns: ToolRun[], toolCall: ToolCall): Promise<ToolRun> {
+    async createToolRun(
+      conversationId: string,
+      events: ConversationEvent[],
+      toolCall: ToolCall,
+    ): Promise<ToolRun> {
       const timestamp = now()
       const run: ToolRun = {
         id: createId('tool'),
         conversationId,
+        type: 'tool',
         toolCallId: toolCall.id,
         toolName: toolCall.function.name,
         status: 'running',
@@ -460,18 +451,18 @@ export const useAgentStore = defineStore('agent', {
         updatedAt: timestamp,
       }
 
-      await putRecord('toolRuns', run)
-      const nextToolRuns = sortCreated([...toolRuns, run])
-      toolRuns.splice(0, toolRuns.length, ...nextToolRuns)
+      await putRecord('conversationEvents', run)
+      const nextEvents = sortCreated([...events, run])
+      events.splice(0, events.length, ...nextEvents)
 
       if (this.selectedConversationId === conversationId) {
-        this.toolRuns = nextToolRuns
+        this.events = nextEvents
       }
 
       return run
     },
     async updateToolRun(
-      toolRuns: ToolRun[],
+      events: ConversationEvent[],
       run: ToolRun,
       patch: Pick<ToolRun, 'status' | 'output' | 'error'>,
     ) {
@@ -481,12 +472,12 @@ export const useAgentStore = defineStore('agent', {
         updatedAt: now(),
       }
 
-      await putRecord('toolRuns', updated)
-      const nextToolRuns = sortCreated([...toolRuns.filter((item) => item.id !== updated.id), updated])
-      toolRuns.splice(0, toolRuns.length, ...nextToolRuns)
+      await putRecord('conversationEvents', updated)
+      const nextEvents = sortCreated([...events.filter((item) => item.id !== updated.id), updated])
+      events.splice(0, events.length, ...nextEvents)
 
       if (this.selectedConversationId === updated.conversationId) {
-        this.toolRuns = nextToolRuns
+        this.events = nextEvents
       }
     },
     async sendMessage(
@@ -549,23 +540,26 @@ export const useAgentStore = defineStore('agent', {
           conversation: runConversation,
           provider: runProvider,
           files: await loadProjectWorkspaceFiles(runProject.id),
-          toolRuns: sortCreated(
-            await getRecordsByIndex('toolRuns', 'conversationId', runConversation.id),
+          events: sortCreated(
+            await getRecordsByIndex('conversationEvents', 'conversationId', runConversation.id),
           ),
         }
         const timestamp = now()
         const userMessage: ChatMessage = {
           id: createId('message'),
           conversationId: runConversation.id,
+          type: 'message',
           role: 'user',
           content,
           createdAt: timestamp,
+          updatedAt: timestamp,
         }
 
-        await putRecord('messages', userMessage)
+        await putRecord('conversationEvents', userMessage)
+        runContext.events = sortCreated([...runContext.events, userMessage])
 
         if (this.selectedConversationId === runConversation.id) {
-          this.messages = [...this.messages, userMessage]
+          this.events = [...this.events, userMessage]
         }
 
         if (isNewConversation) {
@@ -582,18 +576,15 @@ export const useAgentStore = defineStore('agent', {
           }
         }
 
-        const runMessages = sortCreated(
-          await getRecordsByIndex('messages', 'conversationId', runConversation.id),
-        )
         const finalContent = await runAgentConversation({
           systemPrompt,
-          messages: runMessages,
+          events: runContext.events,
           runContext,
           signal: abortController.signal,
           handlers: {
             createToolRun: (toolCall) =>
-              this.createToolRun(runConversation.id, runContext.toolRuns, toolCall),
-            updateToolRun: (run, patch) => this.updateToolRun(runContext.toolRuns, run, patch),
+              this.createToolRun(runConversation.id, runContext.events, toolCall),
+            updateToolRun: (run, patch) => this.updateToolRun(runContext.events, run, patch),
             writeFile: (path, fileContent) =>
               this.upsertWorkspaceFile(runProject.id, runContext.files, path, fileContent),
             deleteFile: (path) => this.deleteWorkspaceFile(runProject.id, runContext.files, path),
@@ -606,16 +597,18 @@ export const useAgentStore = defineStore('agent', {
         const assistantMessage: ChatMessage = {
           id: createId('message'),
           conversationId: runConversation.id,
+          type: 'message',
           role: 'assistant',
           content: finalContent || emptyFinalMessage,
           createdAt: responseEndedAt,
+          updatedAt: responseEndedAt,
           responseDurationMs: responseEndedAt - userMessage.createdAt,
         }
 
-        await putRecord('messages', assistantMessage)
+        await putRecord('conversationEvents', assistantMessage)
 
         if (this.selectedConversationId === runConversation.id) {
-          this.messages = [...this.messages, assistantMessage]
+          this.events = [...this.events, assistantMessage]
         }
 
       } finally {

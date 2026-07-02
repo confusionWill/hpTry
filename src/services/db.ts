@@ -1,30 +1,21 @@
-import type {
-  ChatMessage,
-  Conversation,
-  Project,
-  Provider,
-  ToolRun,
-  WorkspaceFile,
-} from '@/types/agent'
+import type { ConversationEvent, Conversation, Project, Provider, WorkspaceFile } from '@/types/agent'
 
 const DB_NAME = 'hp-will'
-const DB_VERSION = 3
+const DB_VERSION = 4
 
 export type StoreName =
   | 'projects'
   | 'conversations'
-  | 'messages'
+  | 'conversationEvents'
   | 'providers'
   | 'workspaceFiles'
-  | 'toolRuns'
 
 export interface StoreMap {
   projects: Project
   conversations: Conversation
-  messages: ChatMessage
+  conversationEvents: ConversationEvent
   providers: Provider
   workspaceFiles: WorkspaceFile
-  toolRuns: ToolRun
 }
 
 let databasePromise: Promise<IDBDatabase> | null = null
@@ -94,11 +85,11 @@ function openDatabase(): Promise<IDBDatabase> {
         }
       }
 
-      if (!db.objectStoreNames.contains('messages')) {
-        const store = db.createObjectStore('messages', { keyPath: 'id' })
+      if (!db.objectStoreNames.contains('conversationEvents')) {
+        const store = db.createObjectStore('conversationEvents', { keyPath: 'id' })
         store.createIndex('conversationId', 'conversationId')
       } else {
-        const store = request.transaction?.objectStore('messages')
+        const store = request.transaction?.objectStore('conversationEvents')
 
         if (store) {
           ensureIndex(store, 'conversationId', 'conversationId')
@@ -124,16 +115,6 @@ function openDatabase(): Promise<IDBDatabase> {
         }
       }
 
-      if (!db.objectStoreNames.contains('toolRuns')) {
-        const store = db.createObjectStore('toolRuns', { keyPath: 'id' })
-        store.createIndex('conversationId', 'conversationId')
-      } else {
-        const store = request.transaction?.objectStore('toolRuns')
-
-        if (store) {
-          ensureIndex(store, 'conversationId', 'conversationId')
-        }
-      }
     }
   })
 

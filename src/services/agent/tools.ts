@@ -1,4 +1,4 @@
-import type { Project, ToolCall, ToolRun, WorkspaceFile } from '@/types/agent'
+import type { Project, ToolCall, WorkspaceFile } from '@/types/agent'
 
 export interface ChatTool {
   type: 'function'
@@ -23,7 +23,6 @@ export interface ToolExecutionContext {
   writeFile: (path: string, content: string) => Promise<WorkspaceFile>
   deleteFile: (path: string) => Promise<void>
   renameFile: (fromPath: string, toPath: string) => Promise<WorkspaceFile>
-  recentToolRuns: () => ToolRun[]
 }
 
 export interface ToolExecutionResult {
@@ -292,14 +291,7 @@ export async function executeBrowserAgentTool(
           },
           files: context.listFiles().map((file) => ({
             path: file.path,
-            language: file.language,
             bytes: new Blob([file.content]).size,
-          })),
-          recentToolRuns: context.recentToolRuns().slice(-8).map((run) => ({
-            toolName: run.toolName,
-            status: run.status,
-            output: run.output,
-            error: run.error,
           })),
         }),
       }

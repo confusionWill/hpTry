@@ -1,8 +1,8 @@
 import { executeBrowserAgentTool, hpWillTools } from '@/services/agent/tools'
 import { requestChatCompletion, type ChatMessageParam } from '@/services/openai'
 import type {
-  ChatMessage,
   Conversation,
+  ConversationEvent,
   Project,
   Provider,
   ToolCall,
@@ -17,7 +17,7 @@ export interface AgentRunContext {
   conversation: Conversation
   provider: Provider
   files: WorkspaceFile[]
-  toolRuns: ToolRun[]
+  events: ConversationEvent[]
 }
 
 export interface AgentRunHandlers {
@@ -31,17 +31,49 @@ export interface AgentRunHandlers {
   renameFile: (fromPath: string, toPath: string) => Promise<WorkspaceFile>
 }
 
-function toChatMessages(systemPrompt: string, messages: ChatMessage[]): ChatMessageParam[] {
-  return [
+function toChatMessages(systemPrompt: string, events: ConversationEvent[]): ChatMessageParam[] {
+  const messages: ChatMessageParam[] = [
     {
       role: 'system',
       content: systemPrompt,
     },
-    ...messages.map((message) => ({
-      role: message.role,
-      content: message.content,
-    })),
   ]
+
+  for (const event of events) {
+    if (event.type === 'message') {
+      messages.push({
+        role: event.role,
+        content: event.content,
+      })
+      continue
+    }
+
+    if (event.status === 'running') {
+      continue
+    }
+
+    messages.push({
+      role: 'assistant',
+      content: null,
+      tool_calls: [
+        {
+          id: event.toolCallId,
+          type: 'function',
+          function: {
+            name: event.toolName,
+            arguments: event.input,
+          },
+        },
+      ],
+    })
+    messages.push({
+      role: 'tool',
+      tool_call_id: event.toolCallId,
+      content: buildToolResultContent(event.status === 'success', event.output, event.error),
+    })
+  }
+
+  return messages
 }
 
 function buildToolResultContent(ok: boolean, output: string, error = ''): string {
@@ -69,7 +101,6 @@ async function executeToolCall(
       writeFile: handlers.writeFile,
       deleteFile: handlers.deleteFile,
       renameFile: handlers.renameFile,
-      recentToolRuns: () => runContext.toolRuns,
     })
 
     await handlers.updateToolRun(run, {
@@ -102,12 +133,12 @@ async function executeToolCall(
 
 export async function runAgentConversation(params: {
   systemPrompt: string
-  messages: ChatMessage[]
+  events: ConversationEvent[]
   runContext: AgentRunContext
   handlers: AgentRunHandlers
   signal?: AbortSignal
 }): Promise<string> {
-  const agentMessages = toChatMessages(params.systemPrompt, params.messages)
+  const agentMessages = toChatMessages(params.systemPrompt, params.events)
 
   for (let round = 0; round < MAX_AGENT_TOOL_ROUNDS; round += 1) {
     const response = await requestChatCompletion({

@@ -1,5 +1,6 @@
 export type MessageRole = 'system' | 'user' | 'assistant'
 export type ToolRunStatus = 'running' | 'success' | 'error'
+export type ConversationEventType = 'message' | 'tool'
 
 export interface Project {
   id: string
@@ -17,12 +18,14 @@ export interface Conversation {
   updatedAt: number
 }
 
-export interface ChatMessage {
+export interface ConversationMessageEvent {
   id: string
   conversationId: string
+  type: 'message'
   role: MessageRole
   content: string
   createdAt: number
+  updatedAt: number
   responseDurationMs?: number
 }
 
@@ -53,9 +56,10 @@ export interface WorkspaceFile {
   updatedAt: number
 }
 
-export interface ToolRun {
+export interface ConversationToolEvent {
   id: string
   conversationId: string
+  type: 'tool'
   toolCallId: string
   toolName: string
   status: ToolRunStatus
@@ -65,6 +69,10 @@ export interface ToolRun {
   createdAt: number
   updatedAt: number
 }
+
+export type ConversationEvent = ConversationMessageEvent | ConversationToolEvent
+export type ChatMessage = ConversationMessageEvent
+export type ToolRun = ConversationToolEvent
 
 export interface ToolFunctionCall {
   name: string
