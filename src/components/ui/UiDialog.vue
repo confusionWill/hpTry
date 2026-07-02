@@ -5,6 +5,7 @@
         v-if="model"
         class="ui-dialog__overlay"
         role="presentation"
+        :style="{ zIndex: currentZIndex }"
         @click.self="close"
       >
         <section
@@ -40,9 +41,15 @@
   </Teleport>
 </template>
 
+<script lang="ts">
+const dialogZIndexBase = 1000
+const dialogZIndexStep = 10
+let nextDialogZIndex = dialogZIndexBase
+</script>
+
 <script setup lang="ts">
 import { X } from '@lucide/vue'
-import { watch } from 'vue'
+import { ref, watch } from 'vue'
 
 const model = defineModel<boolean>({ required: true })
 
@@ -69,6 +76,8 @@ const emit = defineEmits<{
   closed: []
 }>()
 
+const currentZIndex = ref(dialogZIndexBase)
+
 function close() {
   model.value = false
 }
@@ -76,17 +85,22 @@ function close() {
 watch(
   () => model.value,
   (visible, previousVisible) => {
+    if (visible) {
+      currentZIndex.value = nextDialogZIndex
+      nextDialogZIndex += dialogZIndexStep
+    }
+
     if (!visible && previousVisible) {
       emit('closed')
     }
   },
+  { immediate: true },
 )
 </script>
 
 <style scoped>
 .ui-dialog__overlay {
   position: fixed;
-  z-index: 1000;
   inset: 0;
   display: grid;
   place-items: center;
