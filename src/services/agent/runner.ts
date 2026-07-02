@@ -105,6 +105,7 @@ export async function runAgentConversation(params: {
   messages: ChatMessage[]
   runContext: AgentRunContext
   handlers: AgentRunHandlers
+  signal?: AbortSignal
 }): Promise<string> {
   const agentMessages = toChatMessages(params.systemPrompt, params.messages)
 
@@ -114,6 +115,7 @@ export async function runAgentConversation(params: {
       messages: agentMessages,
       tools: hpWillTools,
       toolChoice: 'auto',
+      signal: params.signal,
     })
     const toolCalls = response.message.tool_calls ?? []
 
@@ -140,6 +142,7 @@ export async function generateConversationTitle(params: {
   provider: Provider
   titlePrompt: string
   userMessage: string
+  signal?: AbortSignal
 }): Promise<string> {
   const response = await requestChatCompletion({
     provider: params.provider,
@@ -154,6 +157,8 @@ export async function generateConversationTitle(params: {
       },
     ],
     toolChoice: 'none',
+    signal: params.signal,
+    timeoutMs: 30_000,
   })
 
   return response.message.content?.trim().replace(/^["'“”‘’]+|["'“”‘’]+$/g, '') ?? ''

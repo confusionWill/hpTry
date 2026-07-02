@@ -35,6 +35,7 @@ import { createId, now, sortCreated, sortUpdated } from '@/utils/records'
 
 const SELECTED_PROJECT_STORAGE_KEY = 'hpWill:selected-project-id'
 const SELECTED_PROVIDER_STORAGE_KEY = 'hpWill:selected-provider-id'
+const activeRunControllers = new Map<string, AbortController>()
 
 interface ActiveAgentRun {
   projectId: string
@@ -256,6 +257,22 @@ export const useAgentStore = defineStore('agent', {
         this.selectedWorkspaceFilePath = ''
         this.draftConversationProjectId = ''
       }
+    },
+    stopProjectRun(projectId: string) {
+      const run = this.activeRuns.find((item) => item.projectId === projectId)
+
+      if (!run) {
+        return
+      }
+
+      activeRunControllers.get(run.conversationId)?.abort()
+    },
+    stopSelectedProjectRun() {
+      if (!this.selectedProjectId) {
+        return
+      }
+
+      this.stopProjectRun(this.selectedProjectId)
     },
     startDraftConversation() {
       if (!this.selectedProjectId) {
@@ -523,6 +540,8 @@ export const useAgentStore = defineStore('agent', {
           conversationId: runConversation.id,
         },
       ]
+      const abortController = new AbortController()
+      activeRunControllers.set(runConversation.id, abortController)
 
       try {
         const runContext: AgentRunContext = {
@@ -555,6 +574,7 @@ export const useAgentStore = defineStore('agent', {
               provider: runProvider,
               titlePrompt,
               userMessage: content,
+              signal: abortController.signal,
             })
             await this.updateConversationTitle(runConversation.id, title)
           } catch {
@@ -569,6 +589,7 @@ export const useAgentStore = defineStore('agent', {
           systemPrompt,
           messages: runMessages,
           runContext,
+          signal: abortController.signal,
           handlers: {
             createToolRun: (toolCall) =>
               this.createToolRun(runConversation.id, runContext.toolRuns, toolCall),
@@ -621,6 +642,7 @@ export const useAgentStore = defineStore('agent', {
         this.activeRuns = this.activeRuns.filter(
           (run) => run.conversationId !== runConversation.id,
         )
+        activeRunControllers.delete(runConversation.id)
       }
     },
     async exportCurrentWorkspaceZip() {

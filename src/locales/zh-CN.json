@@ -37,6 +37,8 @@
     "inputPlaceholder": "输入消息，按 Enter 发送，Shift + Enter 换行",
     "send": "发送",
     "sending": "发送中",
+    "stop": "停止",
+    "stopped": "已停止生成。",
     "answerDuration": "回答耗时：{duration}",
     "deleteConfirm": "确认删除该会话？"
   },
@@ -50,7 +52,11 @@
     "apiKeyPlaceholder": "输入 API Key",
     "model": "模型",
     "modelPlaceholder": "例如 gpt-4.1-mini",
+    "test": "测试连接",
+    "testSuccess": "连接测试成功。",
+    "testFailed": "连接测试失败，请检查供应商配置。",
     "deleteConfirm": "确认删除该供应商？",
+    "requestTimeout": "请求超时，请稍后重试或检查供应商配置。",
     "requestFailed": "请求失败，请检查供应商配置。",
     "missing": "请先选择供应商。"
   },

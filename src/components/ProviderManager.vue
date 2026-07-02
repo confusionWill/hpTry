@@ -75,10 +75,17 @@
         {{ t('common.delete') }}
       </UiButton>
       <span />
+      <UiButton
+        :disabled="!canSave || testingProvider"
+        :loading="testingProvider"
+        @click="testProvider"
+      >
+        {{ t('provider.test') }}
+      </UiButton>
       <UiButton @click="formVisible = false">
         {{ t('common.cancel') }}
       </UiButton>
-      <UiButton :disabled="!canSave" variant="primary" @click="saveProvider">
+      <UiButton :disabled="!canSave || testingProvider" variant="primary" @click="saveProvider">
         {{ editingProviderId ? t('common.save') : t('provider.add') }}
       </UiButton>
     </template>
@@ -94,8 +101,10 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
+import { ChatCompletionRequestError, requestChatCompletion } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
+import type { Provider } from '@/types/agent'
 
 const visible = defineModel<boolean>({ required: true })
 
@@ -104,6 +113,7 @@ const uiStore = useUiStore()
 const { t } = useI18n()
 const formVisible = ref(false)
 const editingProviderId = ref('')
+const testingProvider = ref(false)
 const form = reactive({
   name: '',
   baseUrl: '',
@@ -157,6 +167,57 @@ async function saveProvider() {
     editingProviderId.value || undefined,
   )
   formVisible.value = false
+}
+
+function providerFromForm(): Provider {
+  const timestamp = Date.now()
+
+  return {
+    id: editingProviderId.value || 'provider-test',
+    name: form.name.trim(),
+    baseUrl: form.baseUrl.trim(),
+    apiKey: form.apiKey.trim(),
+    model: form.model.trim(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+}
+
+async function testProvider() {
+  if (!canSave.value || testingProvider.value) {
+    return
+  }
+
+  testingProvider.value = true
+
+  try {
+    await requestChatCompletion({
+      provider: providerFromForm(),
+      messages: [
+        {
+          role: 'system',
+          content: 'Reply with ok.',
+        },
+        {
+          role: 'user',
+          content: 'ok',
+        },
+      ],
+      toolChoice: 'none',
+      timeoutMs: 15_000,
+    })
+    uiStore.showToast(t('provider.testSuccess'), 'success')
+  } catch (error) {
+    if (error instanceof ChatCompletionRequestError && error.code === 'timeout') {
+      uiStore.showToast(t('provider.requestTimeout'), 'error')
+      return
+    }
+
+    const message = error instanceof Error ? error.message : t('provider.testFailed')
+    uiStore.showToast(message || t('provider.testFailed'), 'error')
+  } finally {
+    testingProvider.value = false
+  }
 }
 
 async function confirmDeleteProvider() {

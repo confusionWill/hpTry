@@ -37,6 +37,8 @@
     "inputPlaceholder": "Type a message, Enter to send, Shift + Enter for newline",
     "send": "Send",
     "sending": "Sending",
+    "stop": "Stop",
+    "stopped": "Generation stopped.",
     "answerDuration": "Answered in {duration}",
     "deleteConfirm": "Delete this conversation?"
   },
@@ -50,7 +52,11 @@
     "apiKeyPlaceholder": "Enter API Key",
     "model": "Model",
     "modelPlaceholder": "Example: gpt-4.1-mini",
+    "test": "Test connection",
+    "testSuccess": "Connection test succeeded.",
+    "testFailed": "Connection test failed. Check provider settings.",
     "deleteConfirm": "Delete this provider?",
+    "requestTimeout": "Request timed out. Try again later or check provider settings.",
     "requestFailed": "Request failed. Check provider settings.",
     "missing": "Select a provider first."
   },

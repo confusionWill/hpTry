@@ -47,15 +47,16 @@
               @keydown.enter.exact.prevent="send"
             />
             <UiButton
-              :disabled="!draft.trim() || currentProjectRunning"
-              :loading="currentProjectRunning"
+              :danger="currentProjectRunning"
+              :disabled="!draft.trim() && !currentProjectRunning"
               variant="primary"
-              @click="send"
+              @click="handleComposerAction"
             >
               <template #icon>
-                <Send :size="16" />
+                <Square v-if="currentProjectRunning" :size="14" />
+                <Send v-else :size="16" />
               </template>
-              {{ currentProjectRunning ? t('conversation.sending') : t('conversation.send') }}
+              {{ currentProjectRunning ? t('conversation.stop') : t('conversation.send') }}
             </UiButton>
           </div>
         </div>
@@ -67,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-import { Send } from '@lucide/vue'
+import { Send, Square } from '@lucide/vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -76,6 +77,7 @@ import UiEmpty from '@/components/ui/UiEmpty.vue'
 import UiTextarea from '@/components/ui/UiTextarea.vue'
 import WorkspacePanel from '@/components/WorkspacePanel.vue'
 import { AGENT_SYSTEM_PROMPT, CONVERSATION_TITLE_PROMPT } from '@/services/agent/prompts'
+import { ChatCompletionRequestError } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 
@@ -129,9 +131,26 @@ async function send() {
       t('conversation.new'),
     )
   } catch (error) {
+    if (error instanceof ChatCompletionRequestError) {
+      uiStore.showToast(
+        error.code === 'timeout' ? t('provider.requestTimeout') : t('conversation.stopped'),
+        error.code === 'timeout' ? 'error' : 'info',
+      )
+      return
+    }
+
     const message = error instanceof Error ? error.message : t('provider.requestFailed')
     uiStore.showToast(message || t('provider.requestFailed'), 'error')
   }
+}
+
+function handleComposerAction() {
+  if (currentProjectRunning.value) {
+    store.stopSelectedProjectRun()
+    return
+  }
+
+  void send()
 }
 </script>
 
