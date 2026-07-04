@@ -137,8 +137,6 @@
             </UiButton>
           </div>
         </div>
-
-        <WorkspacePanel />
       </div>
     </template>
   </section>
@@ -153,7 +151,6 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import UiTextarea from '@/components/ui/UiTextarea.vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
-import WorkspacePanel from '@/components/WorkspacePanel.vue'
 import { AGENT_SYSTEM_PROMPT, CONVERSATION_TITLE_PROMPT } from '@/services/agent/prompts'
 import { ChatCompletionRequestError } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
@@ -671,9 +668,4 @@ function handleComposerAction() {
   padding: 14px 18px;
 }
 
-@media (max-width: 1180px) {
-  .chat-panel__body {
-    min-width: 980px;
-  }
-}
 </style>

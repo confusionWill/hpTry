@@ -263,12 +263,11 @@ async function confirmDeleteConversation(conversationId: string) {
 <style scoped>
 .sidebar {
   display: flex;
-  width: 300px;
-  min-width: 300px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   flex-direction: column;
   gap: 16px;
-  border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
   padding: 16px;
 }

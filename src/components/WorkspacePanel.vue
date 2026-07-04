@@ -77,11 +77,11 @@ async function exportZip() {
 <style scoped>
 .workspace-panel {
   display: flex;
-  width: 380px;
-  min-width: 380px;
+  width: 100%;
+  min-width: 0;
   height: 100%;
   flex-direction: column;
-  border-left: 1px solid var(--ui-border-color-light);
+  border-top: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
 }
 
@@ -127,8 +127,8 @@ async function exportZip() {
 
 @media (max-width: 1180px) {
   .workspace-panel {
-    width: 330px;
-    min-width: 330px;
+    width: 100%;
+    min-width: 0;
   }
 }
 </style>

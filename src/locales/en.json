@@ -94,6 +94,7 @@
     "fileCount": "{count} files",
     "files": "Files",
     "preview": "Content",
+    "placeholder": "Middle placeholder",
     "emptyFiles": "No files yet",
     "emptyPreview": "Select a file to view content",
     "exportZip": "Export ZIP",
