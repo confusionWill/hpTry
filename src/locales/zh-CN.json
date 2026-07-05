@@ -94,11 +94,16 @@
     "fileCount": "{count} 个文件",
     "files": "文件",
     "preview": "内容",
-    "placeholder": "中间占位区",
     "emptyFiles": "暂无文件",
     "emptyPreview": "选择一个文件查看内容",
     "exportZip": "导出 ZIP",
     "exportFailed": "导出失败",
+    "livePreview": {
+      "title": "实时预览",
+      "noEntry": "等待 hp.html",
+      "missingIndex": "工作区需要 hp.html 才能预览",
+      "unavailable": "当前浏览器不支持实时预览服务"
+    },
     "previewDialog": {
       "ariaLabel": "文件预览",
       "unavailable": "无法预览该文件内容",

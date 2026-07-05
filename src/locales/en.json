@@ -94,11 +94,16 @@
     "fileCount": "{count} files",
     "files": "Files",
     "preview": "Content",
-    "placeholder": "Middle placeholder",
     "emptyFiles": "No files yet",
     "emptyPreview": "Select a file to view content",
     "exportZip": "Export ZIP",
     "exportFailed": "Export failed",
+    "livePreview": {
+      "title": "Live preview",
+      "noEntry": "Waiting for hp.html",
+      "missingIndex": "The workspace needs hp.html to preview",
+      "unavailable": "This browser does not support the live preview service"
+    },
     "previewDialog": {
       "ariaLabel": "File preview",
       "unavailable": "Unable to preview this file content",

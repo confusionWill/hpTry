@@ -12,9 +12,7 @@
     </section>
 
     <template v-else>
-      <section class="workspace__placeholder">
-        <UiEmpty :description="t('workspace.placeholder')" :image-size="72" />
-      </section>
+      <LivePreviewPanel />
 
       <ChatPanel />
     </template>
@@ -28,6 +26,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import ChatPanel from '@/components/ChatPanel.vue'
+import LivePreviewPanel from '@/components/LivePreviewPanel.vue'
 import ProjectConversationSidebar from '@/components/ProjectConversationSidebar.vue'
 import ProviderManager from '@/components/ProviderManager.vue'
 import WorkspacePanel from '@/components/WorkspacePanel.vue'
@@ -59,15 +58,6 @@ onMounted(() => {
   border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
   grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
-}
-
-.workspace__placeholder {
-  display: grid;
-  min-width: 0;
-  min-height: 0;
-  border-right: 1px solid var(--ui-border-color-light);
-  background: var(--ui-bg-color-page);
-  place-items: center;
 }
 
 .project-empty {
