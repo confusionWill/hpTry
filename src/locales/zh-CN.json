@@ -101,6 +101,8 @@
     "livePreview": {
       "title": "实时预览",
       "noEntry": "等待 hp.html",
+      "aspectRatio": "比例",
+      "aspectRatioNone": "无",
       "missingIndex": "工作区需要 hp.html 才能预览",
       "unavailable": "当前浏览器不支持实时预览服务"
     },

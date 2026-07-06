@@ -101,6 +101,8 @@
     "livePreview": {
       "title": "Live preview",
       "noEntry": "Waiting for hp.html",
+      "aspectRatio": "Ratio",
+      "aspectRatioNone": "None",
       "missingIndex": "The workspace needs hp.html to preview",
       "unavailable": "This browser does not support the live preview service"
     },

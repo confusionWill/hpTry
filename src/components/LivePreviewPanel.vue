@@ -5,6 +5,11 @@
         <h2>{{ t('workspace.livePreview.title') }}</h2>
         <p>{{ previewPathLabel }}</p>
       </div>
+
+      <div class="live-preview__actions">
+        <PreviewAspectRatioSelect v-model="selectedAspectRatio" />
+        <WorkspaceExportButton />
+      </div>
     </header>
 
     <div class="live-preview__body">
@@ -18,13 +23,19 @@
         :description="t('workspace.livePreview.unavailable')"
         :image-size="72"
       />
-      <iframe
+      <div
         v-else
-        :key="previewUrl"
-        class="live-preview__frame"
-        :src="previewUrl"
-        :title="t('workspace.livePreview.title')"
-      />
+        class="live-preview__viewport"
+        :class="{ 'live-preview__viewport--fixed': selectedAspectRatioValue !== null }"
+        :style="previewViewportStyle"
+      >
+        <iframe
+          :key="previewUrl"
+          class="live-preview__frame"
+          :src="previewUrl"
+          :title="t('workspace.livePreview.title')"
+        />
+      </div>
     </div>
   </section>
 </template>
@@ -33,13 +44,37 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import PreviewAspectRatioSelect from '@/components/PreviewAspectRatioSelect.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
+import WorkspaceExportButton from '@/components/WorkspaceExportButton.vue'
 import { useAgentStore } from '@/stores/agent'
 import type { WorkspaceFile } from '@/types/agent'
 
 const store = useAgentStore()
 const { t } = useI18n()
 const previewWorkerReady = ref(false)
+
+const selectedAspectRatio = ref('none')
+
+const aspectRatioMap: Record<string, number | null> = {
+  '16-9': 16 / 9,
+  '9-16': 9 / 16,
+  '4-3': 4 / 3,
+  '3-4': 3 / 4,
+  none: null,
+}
+
+const selectedAspectRatioValue = computed(() => aspectRatioMap[selectedAspectRatio.value] ?? null)
+
+const previewViewportStyle = computed<Partial<Record<string, string>>>(() => {
+  if (selectedAspectRatioValue.value === null) {
+    return {}
+  }
+
+  return {
+    '--preview-aspect-ratio': selectedAspectRatioValue.value.toString(),
+  }
+})
 
 const fileMap = computed(() => {
   const files = new Map<string, WorkspaceFile>()
@@ -177,13 +212,35 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   white-space: nowrap;
 }
 
+.live-preview__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 10px;
+}
+
 .live-preview__body {
   display: grid;
   min-width: 0;
   min-height: 0;
   flex: 1;
   background: var(--ui-fill-color-light);
+  container-type: size;
   place-items: center;
+}
+
+.live-preview__viewport {
+  width: 100%;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--ui-border-color-light);
+}
+
+.live-preview__viewport--fixed {
+  width: min(100%, calc(100cqh * var(--preview-aspect-ratio)));
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: var(--preview-aspect-ratio);
 }
 
 .live-preview__frame {
@@ -191,5 +248,18 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   height: 100%;
   border: 0;
   background: #ffffff;
+}
+
+@media (max-width: 980px) {
+  .live-preview__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .live-preview__actions {
+    width: 100%;
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>
