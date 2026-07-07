@@ -57,7 +57,7 @@ onMounted(() => {
   min-height: 0;
   border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
-  grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
 }
 
 .project-empty {
