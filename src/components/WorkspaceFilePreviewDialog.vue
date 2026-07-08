@@ -19,7 +19,7 @@
         <small>{{ previewLabel }}</small>
       </div>
 
-      <pre v-if="previewType === 'text'" class="file-preview-dialog__text"><code>{{ file.content }}</code></pre>
+      <pre v-if="previewType === 'text'" class="file-preview-dialog__text"><code>{{ textContent }}</code></pre>
       <div v-else-if="previewType === 'image'" class="file-preview-dialog__media">
         <img
           v-if="mediaSource"
@@ -44,6 +44,31 @@
           :image-size="52"
         />
       </div>
+      <div v-else-if="previewType === 'audio'" class="file-preview-dialog__media">
+        <audio
+          v-if="mediaSource"
+          :src="mediaSource"
+          controls
+        />
+        <UiEmpty
+          v-else
+          :description="t('workspace.previewDialog.unavailable')"
+          :image-size="52"
+        />
+      </div>
+      <div v-else-if="previewType === 'pdf'" class="file-preview-dialog__media">
+        <iframe
+          v-if="mediaSource"
+          class="file-preview-dialog__frame"
+          :src="mediaSource"
+          :title="file.path"
+        />
+        <UiEmpty
+          v-else
+          :description="t('workspace.previewDialog.unavailable')"
+          :image-size="52"
+        />
+      </div>
       <UiEmpty
         v-else
         :description="t('workspace.previewDialog.unsupported')"
@@ -54,14 +79,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
+import { loadWorkspaceAsset } from '@/services/agent/workspaceFiles'
 import type { WorkspaceFile } from '@/types/agent'
 
-type PreviewType = 'image' | 'text' | 'unsupported' | 'video'
+type PreviewType = 'audio' | 'image' | 'pdf' | 'text' | 'unsupported' | 'video'
 
 const model = defineModel<boolean>({ required: true })
 
@@ -70,6 +96,8 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const assetObjectUrl = ref('')
+const assetTextContent = ref('')
 
 const previewType = computed<PreviewType>(() => getPreviewType(props.file))
 const previewLabel = computed(() => {
@@ -77,14 +105,44 @@ const previewLabel = computed(() => {
     return ''
   }
 
-  return mimeTypeForPath(props.file.path) ?? props.file.language
+  return props.file.mimeType ?? mimeTypeForPath(props.file.path) ?? props.file.language
 })
 const mediaSource = computed(() => {
-  if (!props.file || (previewType.value !== 'image' && previewType.value !== 'video')) {
+  if (
+    !props.file ||
+    !['audio', 'image', 'pdf', 'video'].includes(previewType.value)
+  ) {
     return ''
   }
 
+  if (props.file.kind === 'asset') {
+    return assetObjectUrl.value
+  }
+
   return sourceForMedia(props.file)
+})
+const textContent = computed(() => {
+  if (!props.file) {
+    return ''
+  }
+
+  if (props.file.kind === 'asset') {
+    return assetTextContent.value
+  }
+
+  return props.file.content
+})
+
+watch(
+  () => props.file,
+  (file) => {
+    void loadAssetPreview(file)
+  },
+  { immediate: true },
+)
+
+onBeforeUnmount(() => {
+  revokeAssetObjectUrl()
 })
 
 function getPreviewType(file?: WorkspaceFile): PreviewType {
@@ -92,17 +150,77 @@ function getPreviewType(file?: WorkspaceFile): PreviewType {
     return 'unsupported'
   }
 
+  const mimeType = file.mimeType ?? mimeTypeForPath(file.path)
   const extension = extensionForPath(file.path)
 
-  if (imageMimeTypes[extension]) {
+  if (mimeType.startsWith('image/')) {
     return 'image'
   }
 
-  if (videoMimeTypes[extension]) {
+  if (mimeType.startsWith('video/')) {
     return 'video'
   }
 
+  if (mimeType.startsWith('audio/')) {
+    return 'audio'
+  }
+
+  if (mimeType === 'application/pdf') {
+    return 'pdf'
+  }
+
+  if (file.kind === 'asset') {
+    return isTextAsset(file) ? 'text' : 'unsupported'
+  }
+
   return binaryExtensions.has(extension) ? 'unsupported' : 'text'
+}
+
+async function loadAssetPreview(file?: WorkspaceFile) {
+  revokeAssetObjectUrl()
+  assetTextContent.value = ''
+
+  if (!file || file.kind !== 'asset') {
+    return
+  }
+
+  const asset = await loadWorkspaceAsset(file)
+
+  if (!asset) {
+    return
+  }
+
+  if (['audio', 'image', 'pdf', 'video'].includes(getPreviewType(file))) {
+    assetObjectUrl.value = URL.createObjectURL(asset.blob)
+    return
+  }
+
+  if (isTextAsset(file) && asset.size <= 240_000) {
+    assetTextContent.value = await asset.blob.text()
+  }
+}
+
+function revokeAssetObjectUrl() {
+  if (!assetObjectUrl.value) {
+    return
+  }
+
+  URL.revokeObjectURL(assetObjectUrl.value)
+  assetObjectUrl.value = ''
+}
+
+function isTextAsset(file: WorkspaceFile): boolean {
+  const mimeType = file.mimeType ?? ''
+
+  return (
+    mimeType.startsWith('text/') ||
+    [
+      'application/json',
+      'application/javascript',
+      'application/xml',
+      'image/svg+xml',
+    ].includes(mimeType)
+  )
 }
 
 function sourceForMedia(file: WorkspaceFile): string {
@@ -134,7 +252,13 @@ function sourceForMedia(file: WorkspaceFile): string {
 function mimeTypeForPath(path: string): string {
   const extension = extensionForPath(path)
 
-  return imageMimeTypes[extension] ?? videoMimeTypes[extension] ?? 'text/plain'
+  return (
+    imageMimeTypes[extension] ??
+    videoMimeTypes[extension] ??
+    audioMimeTypes[extension] ??
+    documentMimeTypes[extension] ??
+    'text/plain'
+  )
 }
 
 function extensionForPath(path: string): string {
@@ -164,6 +288,16 @@ const videoMimeTypes: Record<string, string> = {
   webm: 'video/webm',
 }
 
+const audioMimeTypes: Record<string, string> = {
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+  wav: 'audio/wav',
+}
+
+const documentMimeTypes: Record<string, string> = {
+  pdf: 'application/pdf',
+}
+
 const binaryExtensions = new Set([
   '7z',
   'bz2',
@@ -172,7 +306,6 @@ const binaryExtensions = new Set([
   'docx',
   'exe',
   'gz',
-  'pdf',
   'ppt',
   'pptx',
   'rar',
@@ -247,5 +380,16 @@ const binaryExtensions = new Set([
   max-width: 100%;
   max-height: 60vh;
   border-radius: 6px;
+}
+
+.file-preview-dialog__media audio {
+  width: min(520px, 86%);
+}
+
+.file-preview-dialog__frame {
+  width: 100%;
+  height: 100%;
+  min-height: min(62vh, 560px);
+  border: 0;
 }
 </style>

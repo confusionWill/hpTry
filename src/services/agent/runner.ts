@@ -1,4 +1,4 @@
-import { executeBrowserAgentTool, hpWillTools } from '@/services/agent/tools'
+import { executeBrowserAgentTool, hpTryTools } from '@/services/agent/tools'
 import { requestChatCompletion, type ChatMessageParam } from '@/services/openai'
 import type {
   Conversation,
@@ -144,7 +144,7 @@ export async function runAgentConversation(params: {
     const response = await requestChatCompletion({
       provider: params.runContext.provider,
       messages: agentMessages,
-      tools: hpWillTools,
+      tools: hpTryTools,
       toolChoice: 'auto',
       signal: params.signal,
     })

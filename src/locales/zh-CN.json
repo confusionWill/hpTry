@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "hpWill"
+    "title": "hpTry"
   },
   "common": {
     "cancel": "取消",
@@ -39,6 +39,15 @@
     "sending": "发送中",
     "stop": "停止",
     "stopped": "已停止生成。",
+    "upload": {
+      "selectFiles": "上传资源",
+      "removeFile": "从本次消息移除 {name}",
+      "uploaded": "已上传 {count} 个资源到工作区。",
+      "failed": "上传失败",
+      "missingProject": "请先选择项目。",
+      "messageHeading": "已上传到工作区的资源：",
+      "messageInstruction": "请根据上面的资源路径读取并使用这些文件。"
+    },
     "answerDuration": "回答耗时：{duration}",
     "viewMarkdownSource": "查看原始 Markdown",
     "previewMarkdown": "查看 Markdown 预览",

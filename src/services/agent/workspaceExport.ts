@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 
+import { loadWorkspaceAsset } from '@/services/agent/workspaceFiles'
 import type { Project, WorkspaceFile } from '@/types/agent'
 
 function slugify(value: string): string {
@@ -9,7 +10,7 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '-')
     .replace(/^-+|-+$/g, '')
 
-  return slug || 'hpWill-project'
+  return slug || 'hpTry-project'
 }
 
 function downloadBlob(blob: Blob, fileName: string): void {
@@ -33,12 +34,19 @@ export async function exportWorkspaceAsZip(project: Project, files: WorkspaceFil
     throw new Error('Failed to create ZIP folder')
   }
 
-  files
-    .slice()
-    .sort((a, b) => a.path.localeCompare(b.path))
-    .forEach((file) => {
+  for (const file of files.slice().sort((a, b) => a.path.localeCompare(b.path))) {
+    if (file.kind === 'asset') {
+      const asset = await loadWorkspaceAsset(file)
+
+      if (asset) {
+        root.file(file.path, asset.blob)
+      }
+
+      continue
+    }
+
       root.file(file.path, file.content)
-    })
+  }
 
   const blob = await zip.generateAsync({ type: 'blob' })
   downloadBlob(blob, `${rootName}.zip`)

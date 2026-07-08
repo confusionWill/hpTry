@@ -1,13 +1,21 @@
-import type { ConversationEvent, Conversation, Project, Provider, WorkspaceFile } from '@/types/agent'
+import type {
+  ConversationEvent,
+  Conversation,
+  Project,
+  Provider,
+  WorkspaceAsset,
+  WorkspaceFile,
+} from '@/types/agent'
 
-const DB_NAME = 'hp-will'
-const DB_VERSION = 4
+const DB_NAME = 'hpTry'
+const DB_VERSION = 5
 
 export type StoreName =
   | 'projects'
   | 'conversations'
   | 'conversationEvents'
   | 'providers'
+  | 'workspaceAssets'
   | 'workspaceFiles'
 
 export interface StoreMap {
@@ -15,6 +23,7 @@ export interface StoreMap {
   conversations: Conversation
   conversationEvents: ConversationEvent
   providers: Provider
+  workspaceAssets: WorkspaceAsset
   workspaceFiles: WorkspaceFile
 }
 
@@ -112,6 +121,21 @@ function openDatabase(): Promise<IDBDatabase> {
           ensureIndex(store, 'projectId', 'projectId')
           ensureIndex(store, 'path', 'path')
           dedupeWorkspaceFilesBeforeProjectPathIndex(store)
+        }
+      }
+
+      if (!db.objectStoreNames.contains('workspaceAssets')) {
+        const store = db.createObjectStore('workspaceAssets', { keyPath: 'id' })
+        store.createIndex('projectId', 'projectId')
+        store.createIndex('path', 'path')
+        store.createIndex('projectPath', ['projectId', 'path'], { unique: true })
+      } else {
+        const store = request.transaction?.objectStore('workspaceAssets')
+
+        if (store) {
+          ensureIndex(store, 'projectId', 'projectId')
+          ensureIndex(store, 'path', 'path')
+          ensureIndex(store, 'projectPath', ['projectId', 'path'], { unique: true })
         }
       }
 

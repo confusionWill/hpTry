@@ -32,7 +32,7 @@ export interface ToolExecutionResult {
 
 const MAX_FILE_BYTES = 120_000
 
-export const hpWillTools: ChatTool[] = [
+export const hpTryTools: ChatTool[] = [
   {
     type: 'function',
     function: {
@@ -233,10 +233,26 @@ export async function executeBrowserAgentTool(
         throw new Error(`File not found: ${path}`)
       }
 
+      if (file.kind === 'asset') {
+        return {
+          ok: true,
+          output: JSON.stringify({
+            path: file.path,
+            kind: 'asset',
+            name: file.name ?? file.path.split('/').pop() ?? file.path,
+            mimeType: file.mimeType ?? 'application/octet-stream',
+            bytes: file.size ?? 0,
+            content: '',
+            note: 'This is a binary workspace asset. Reference it by path instead of reading its raw content.',
+          }),
+        }
+      }
+
       return {
         ok: true,
         output: JSON.stringify({
           path: file.path,
+          kind: file.kind ?? 'text',
           language: file.language,
           content: file.content,
         }),
@@ -291,7 +307,9 @@ export async function executeBrowserAgentTool(
           },
           files: context.listFiles().map((file) => ({
             path: file.path,
-            bytes: new Blob([file.content]).size,
+            kind: file.kind ?? 'text',
+            mimeType: file.mimeType,
+            bytes: file.size ?? new Blob([file.content]).size,
           })),
         }),
       }

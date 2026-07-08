@@ -52,6 +52,23 @@ export interface WorkspaceFile {
   path: string
   content: string
   language: string
+  kind?: 'text' | 'asset'
+  assetId?: string
+  name?: string
+  mimeType?: string
+  size?: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface WorkspaceAsset {
+  id: string
+  projectId: string
+  path: string
+  name: string
+  mimeType: string
+  size: number
+  blob: Blob
   createdAt: number
   updatedAt: number
 }

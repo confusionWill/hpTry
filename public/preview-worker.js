@@ -1,4 +1,4 @@
-const DB_NAME = 'hp-will'
+const DB_NAME = 'hpTry'
 const PREVIEW_PREFIX = '/preview/'
 
 self.addEventListener('install', (event) => {
@@ -32,7 +32,13 @@ async function handlePreviewRequest(request, url) {
     return notFoundResponse()
   }
 
-  return fileResponse(file, request, previewPath)
+  const asset = file.kind === 'asset' && file.assetId ? await readWorkspaceAsset(file.assetId) : null
+
+  if (file.kind === 'asset' && !asset) {
+    return notFoundResponse()
+  }
+
+  return fileResponse(file, asset, request, previewPath)
 }
 
 function parsePreviewPath(pathname) {
@@ -59,15 +65,31 @@ async function readWorkspaceFile(projectId, filePath) {
   return requestResult(index.get([projectId, filePath]))
 }
 
-function fileResponse(file, request, previewPath) {
-  const headers = baseHeaders(file.path)
-  const body = bodyForFile(file, previewPath)
+async function readWorkspaceAsset(assetId) {
+  const db = await openDatabase()
+  const transaction = db.transaction('workspaceAssets', 'readonly')
+  const store = transaction.objectStore('workspaceAssets')
+
+  return requestResult(store.get(assetId))
+}
+
+async function fileResponse(file, asset, request, previewPath) {
+  const headers = baseHeaders(file.path, file.mimeType)
+  const body = await bodyForFile(file, asset, previewPath)
+
+  if (body instanceof Blob) {
+    const range = request.headers.get('Range')
+
+    if (range) {
+      return blobRangeResponse(body, range, headers)
+    }
+  }
 
   if (body instanceof Uint8Array) {
     const range = request.headers.get('Range')
 
     if (range) {
-      return rangeResponse(body, range, headers)
+      return bytesRangeResponse(body, range, headers)
     }
   }
 
@@ -77,7 +99,11 @@ function fileResponse(file, request, previewPath) {
   })
 }
 
-function bodyForFile(file, previewPath) {
+async function bodyForFile(file, asset, previewPath) {
+  if (asset?.blob) {
+    return asset.blob
+  }
+
   const content = file.content ?? ''
   const trimmedContent = typeof content === 'string' ? content.trim() : ''
   const base64Content = typeof content === 'string' ? content.replace(/\s/g, '') : ''
@@ -149,34 +175,27 @@ function rewriteCssRootUrls(content, previewRoot) {
     )
 }
 
-function baseHeaders(path) {
+function baseHeaders(path, mimeType) {
   return {
-    'Content-Type': mimeTypeForPath(path),
+    'Content-Type': mimeType || mimeTypeForPath(path),
     'Access-Control-Allow-Origin': '*',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
   }
 }
 
-function rangeResponse(bytes, range, headers) {
+function parseRange(range, size) {
   const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim())
 
   if (!match) {
-    return new Response(bytes, {
-      status: 200,
-      headers,
-    })
+    return null
   }
 
-  const size = bytes.byteLength
   const startValue = match[1]
   const endValue = match[2]
 
   if (!startValue && !endValue) {
-    return new Response(bytes, {
-      status: 200,
-      headers,
-    })
+    return null
   }
 
   let start
@@ -186,7 +205,7 @@ function rangeResponse(bytes, range, headers) {
     const suffixLength = Number(endValue)
 
     if (Number.isNaN(suffixLength) || suffixLength <= 0 || size === 0) {
-      return unsatisfiableRangeResponse(size, headers)
+      return { ok: false }
     }
 
     start = Math.max(size - suffixLength, 0)
@@ -196,11 +215,30 @@ function rangeResponse(bytes, range, headers) {
     end = endValue ? Number(endValue) : size - 1
 
     if (Number.isNaN(start) || Number.isNaN(end) || size === 0 || start >= size || start > end) {
-      return unsatisfiableRangeResponse(size, headers)
+      return { ok: false }
     }
 
     end = Math.min(end, size - 1)
   }
+
+  return { ok: true, start, end }
+}
+
+function bytesRangeResponse(bytes, range, headers) {
+  const parsedRange = parseRange(range, bytes.byteLength)
+
+  if (!parsedRange) {
+    return new Response(bytes, {
+      status: 200,
+      headers,
+    })
+  }
+
+  if (!parsedRange.ok) {
+    return unsatisfiableRangeResponse(bytes.byteLength, headers)
+  }
+
+  const { start, end } = parsedRange
 
   return new Response(bytes.slice(start, end + 1), {
     status: 206,
@@ -208,7 +246,34 @@ function rangeResponse(bytes, range, headers) {
       ...headers,
       'Accept-Ranges': 'bytes',
       'Content-Length': String(end - start + 1),
-      'Content-Range': `bytes ${start}-${end}/${size}`,
+      'Content-Range': `bytes ${start}-${end}/${bytes.byteLength}`,
+    },
+  })
+}
+
+function blobRangeResponse(blob, range, headers) {
+  const parsedRange = parseRange(range, blob.size)
+
+  if (!parsedRange) {
+    return new Response(blob, {
+      status: 200,
+      headers,
+    })
+  }
+
+  if (!parsedRange.ok) {
+    return unsatisfiableRangeResponse(blob.size, headers)
+  }
+
+  const { start, end } = parsedRange
+
+  return new Response(blob.slice(start, end + 1), {
+    status: 206,
+    headers: {
+      ...headers,
+      'Accept-Ranges': 'bytes',
+      'Content-Length': String(end - start + 1),
+      'Content-Range': `bytes ${start}-${end}/${blob.size}`,
     },
   })
 }

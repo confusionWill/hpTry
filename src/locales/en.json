@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "hpWill"
+    "title": "hpTry"
   },
   "common": {
     "cancel": "Cancel",
@@ -39,6 +39,15 @@
     "sending": "Sending",
     "stop": "Stop",
     "stopped": "Generation stopped.",
+    "upload": {
+      "selectFiles": "Upload assets",
+      "removeFile": "Remove {name} from this message",
+      "uploaded": "Uploaded {count} assets to the workspace.",
+      "failed": "Upload failed",
+      "missingProject": "Select a project first.",
+      "messageHeading": "Assets uploaded to the workspace:",
+      "messageInstruction": "Use the asset paths above to read and work with these files."
+    },
     "answerDuration": "Answered in {duration}",
     "viewMarkdownSource": "View raw Markdown",
     "previewMarkdown": "View Markdown preview",

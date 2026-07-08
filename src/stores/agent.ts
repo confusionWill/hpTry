@@ -17,6 +17,7 @@ import {
   deleteProjectWorkspaceFile,
   loadProjectWorkspaceFiles,
   renameProjectWorkspaceFile,
+  upsertProjectWorkspaceAsset,
   upsertProjectWorkspaceFile,
 } from '@/services/agent/workspaceFiles'
 import { exportWorkspaceAsZip } from '@/services/agent/workspaceExport'
@@ -34,14 +35,26 @@ import type {
 } from '@/types/agent'
 import { createId, now, sortCreated, sortUpdated } from '@/utils/records'
 
-const SELECTED_PROJECT_STORAGE_KEY = 'hpWill:selected-project-id'
-const SELECTED_PROVIDER_STORAGE_KEY = 'hpWill:selected-provider-id'
+const SELECTED_PROJECT_STORAGE_KEY = 'hpTry:selected-project-id'
+const SELECTED_PROVIDER_STORAGE_KEY = 'hpTry:selected-provider-id'
 const activeRunControllers = new Map<string, AbortController>()
 
 interface ActiveAgentRun {
   projectId: string
   conversationId: string
 }
+
+export type WorkspaceUploadPayload =
+  | {
+      path: string
+      content: string
+    }
+  | {
+      path: string
+      blob: Blob
+      name: string
+      mimeType: string
+    }
 
 function loadSelectedProviderId(): string {
   return localStorage.getItem(SELECTED_PROVIDER_STORAGE_KEY) ?? ''
@@ -234,6 +247,7 @@ export const useAgentStore = defineStore('agent', {
         }),
       )
       await deleteRecordsByIndex('workspaceFiles', 'projectId', projectId)
+      await deleteRecordsByIndex('workspaceAssets', 'projectId', projectId)
       await deleteRecordsByIndex('conversations', 'projectId', projectId)
       await deleteRecord('projects', projectId)
 
@@ -401,6 +415,38 @@ export const useAgentStore = defineStore('agent', {
       }
 
       return file
+    },
+    async uploadFilesToSelectedWorkspace(payloads: WorkspaceUploadPayload[]): Promise<WorkspaceFile[]> {
+      const projectId = this.selectedProjectId
+
+      if (!projectId || payloads.length === 0) {
+        return []
+      }
+
+      const files = [...this.workspaceFiles]
+      const uploadedFiles: WorkspaceFile[] = []
+
+      for (const payload of payloads) {
+        const file =
+          'content' in payload
+            ? await upsertProjectWorkspaceFile(projectId, files, payload.path, payload.content)
+            : await upsertProjectWorkspaceAsset(
+                projectId,
+                files,
+                payload.path,
+                payload.blob,
+                payload.name,
+                payload.mimeType,
+              )
+        uploadedFiles.push(file)
+      }
+
+      if (this.selectedProjectId === projectId) {
+        this.workspaceFiles = [...files]
+        this.selectedWorkspaceFilePath = uploadedFiles.at(-1)?.path ?? this.selectedWorkspaceFilePath
+      }
+
+      return uploadedFiles
     },
     async deleteWorkspaceFile(projectId: string, files: WorkspaceFile[], path: string) {
       const nextFiles = await deleteProjectWorkspaceFile(projectId, files, path)
