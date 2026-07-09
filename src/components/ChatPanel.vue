@@ -604,6 +604,18 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
         ? t('conversation.toolSummary.readFile', { path })
         : t('conversation.toolSummary.readFileFallback')
     }
+    case 'search_files': {
+      const matches = Array.isArray(outputRecord?.matches) ? outputRecord.matches.length : undefined
+      return matches === undefined
+        ? t('conversation.toolSummary.searchFiles')
+        : t('conversation.toolSummary.searchFilesWithCount', { count: matches })
+    }
+    case 'read_files': {
+      const files = Array.isArray(outputRecord?.files) ? outputRecord.files.length : undefined
+      return files === undefined
+        ? t('conversation.toolSummary.readFiles')
+        : t('conversation.toolSummary.readFilesWithCount', { count: files })
+    }
     case 'write_file': {
       const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
       const bytes = getNumber(outputRecord ?? {}, 'bytes')
@@ -618,6 +630,21 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
       return path
         ? t('conversation.toolSummary.writeFile', { path })
         : t('conversation.toolSummary.writeFileFallback')
+    }
+    case 'edit_file': {
+      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
+      const bytes = getNumber(outputRecord ?? {}, 'bytes')
+
+      if (path && bytes !== undefined) {
+        return t('conversation.toolSummary.editFileWithBytes', {
+          path,
+          bytes: formatBytes(bytes),
+        })
+      }
+
+      return path
+        ? t('conversation.toolSummary.editFile', { path })
+        : t('conversation.toolSummary.editFileFallback')
     }
     case 'delete_file': {
       const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
