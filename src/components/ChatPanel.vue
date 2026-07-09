@@ -310,7 +310,9 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
         : t('conversation.toolSummary.readFileFallback')
     }
     case 'search_files': {
-      const matches = Array.isArray(outputRecord?.matches) ? outputRecord.matches.length : undefined
+      const matches =
+        getNumber(outputRecord ?? {}, 'totalMatches') ??
+        (Array.isArray(outputRecord?.matches) ? outputRecord.matches.length : undefined)
       return matches === undefined
         ? t('conversation.toolSummary.searchFiles')
         : t('conversation.toolSummary.searchFilesWithCount', { count: matches })
@@ -350,6 +352,18 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
       return path
         ? t('conversation.toolSummary.editFile', { path })
         : t('conversation.toolSummary.editFileFallback')
+    }
+    case 'replace_in_file': {
+      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
+      const replacements = getNumber(outputRecord ?? {}, 'replacements')
+
+      if (path && replacements !== undefined) {
+        return t('conversation.toolSummary.replaceInFileWithCount', { path, count: replacements })
+      }
+
+      return path
+        ? t('conversation.toolSummary.replaceInFile', { path })
+        : t('conversation.toolSummary.replaceInFileFallback')
     }
     case 'delete_file': {
       const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')

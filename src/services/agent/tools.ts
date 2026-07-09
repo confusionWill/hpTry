@@ -32,7 +32,8 @@ export interface ToolExecutionResult {
 
 const MAX_FILE_BYTES = 120_000
 const MAX_READ_FILES = 20
-const MAX_SEARCH_RESULTS = 50
+const DEFAULT_SEARCH_RESULTS = 50
+const MAX_SEARCH_RESULTS = 100
 
 export const hpTryTools: ChatTool[] = [
   {
@@ -75,11 +76,27 @@ export const hpTryTools: ChatTool[] = [
         properties: {
           query: {
             type: 'string',
-            description: 'Exact text to search for.',
+            description: 'Text or regular expression pattern to search for.',
           },
           path: {
             type: 'string',
             description: 'Optional relative file or directory path to limit the search.',
+          },
+          useRegex: {
+            type: 'boolean',
+            description: 'When true, treat query as a JavaScript regular expression pattern.',
+          },
+          caseSensitive: {
+            type: 'boolean',
+            description: 'When false, match text case-insensitively. Defaults to true.',
+          },
+          maxResults: {
+            type: 'number',
+            description: `Maximum number of matches to return. Defaults to ${DEFAULT_SEARCH_RESULTS}, maximum ${MAX_SEARCH_RESULTS}.`,
+          },
+          offset: {
+            type: 'number',
+            description: 'Number of matches to skip before returning results. Defaults to 0.',
           },
         },
         required: ['query'],
@@ -153,6 +170,45 @@ export const hpTryTools: ChatTool[] = [
           },
         },
         required: ['path', 'oldContent', 'newContent'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'replace_in_file',
+      description:
+        'Replace content in one existing text file by plain text or regular expression search.',
+      parameters: {
+        type: 'object',
+        properties: {
+          path: {
+            type: 'string',
+            description: 'Relative file path, for example src/main.js.',
+          },
+          query: {
+            type: 'string',
+            description: 'Text or regular expression pattern to replace.',
+          },
+          replacement: {
+            type: 'string',
+            description: 'Replacement content.',
+          },
+          useRegex: {
+            type: 'boolean',
+            description: 'When true, treat query as a JavaScript regular expression pattern.',
+          },
+          caseSensitive: {
+            type: 'boolean',
+            description: 'When false, match text case-insensitively. Defaults to true.',
+          },
+          replaceAll: {
+            type: 'boolean',
+            description: 'When true, replace all matches. Defaults to false.',
+          },
+        },
+        required: ['path', 'query', 'replacement'],
         additionalProperties: false,
       },
     },
@@ -241,6 +297,57 @@ function getOptionalString(value: unknown, name: string): string {
   }
 
   return value[name].trim()
+}
+
+function getOptionalBoolean(value: unknown, name: string): boolean {
+  if (!isRecord(value) || value[name] === undefined) {
+    return false
+  }
+
+  if (typeof value[name] !== 'boolean') {
+    throw new Error(`Invalid ${name}`)
+  }
+
+  return value[name]
+}
+
+function getOptionalBooleanDefault(value: unknown, name: string, defaultValue: boolean): boolean {
+  if (!isRecord(value) || value[name] === undefined) {
+    return defaultValue
+  }
+
+  if (typeof value[name] !== 'boolean') {
+    throw new Error(`Invalid ${name}`)
+  }
+
+  return value[name]
+}
+
+function getOptionalInteger(
+  value: unknown,
+  name: string,
+  defaultValue: number,
+  options: { min: number; max?: number },
+): number {
+  if (!isRecord(value) || value[name] === undefined) {
+    return defaultValue
+  }
+
+  if (typeof value[name] !== 'number' || !Number.isInteger(value[name])) {
+    throw new Error(`Invalid ${name}`)
+  }
+
+  const numberValue = value[name]
+
+  if (numberValue < options.min) {
+    throw new Error(`${name} must be at least ${options.min}`)
+  }
+
+  if (options.max !== undefined && numberValue > options.max) {
+    throw new Error(`${name} must be at most ${options.max}`)
+  }
+
+  return numberValue
 }
 
 function getStringArray(value: unknown, name: string): string[] {
@@ -365,9 +472,28 @@ export async function executeBrowserAgentTool(
       const query = getRawString(input, 'query')
       const scopeInput = getOptionalString(input, 'path')
       const scopePath = scopeInput ? normalizeWorkspacePath(scopeInput) : ''
+      const useRegex = getOptionalBoolean(input, 'useRegex')
+      const caseSensitive = getOptionalBooleanDefault(input, 'caseSensitive', true)
+      const maxResults = getOptionalInteger(input, 'maxResults', DEFAULT_SEARCH_RESULTS, {
+        min: 1,
+        max: MAX_SEARCH_RESULTS,
+      })
+      const offset = getOptionalInteger(input, 'offset', 0, { min: 0 })
 
       if (!query) {
         throw new Error('query cannot be empty')
+      }
+
+      let regex: RegExp | undefined
+      const normalizedQuery = caseSensitive ? query : query.toLowerCase()
+
+      if (useRegex) {
+        try {
+          regex = new RegExp(query, caseSensitive ? 'g' : 'gi')
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Invalid regular expression'
+          throw new Error(message)
+        }
       }
 
       const matches: Record<string, unknown>[] = []
@@ -380,10 +506,35 @@ export async function executeBrowserAgentTool(
 
         for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
           const line = lines[lineIndex]
+
+          if (regex) {
+            regex.lastIndex = 0
+            let match = regex.exec(line)
+
+            while (match) {
+              matches.push({
+                path: file.path,
+                line: lineIndex + 1,
+                column: match.index + 1,
+                content: line,
+                match: match[0],
+              })
+
+              if (match[0] === '') {
+                regex.lastIndex += 1
+              }
+
+              match = regex.exec(line)
+            }
+
+            continue
+          }
+
           let searchFrom = 0
+          const searchableLine = caseSensitive ? line : line.toLowerCase()
 
           while (searchFrom <= line.length) {
-            const columnIndex = line.indexOf(query, searchFrom)
+            const columnIndex = searchableLine.indexOf(normalizedQuery, searchFrom)
 
             if (columnIndex === -1) {
               break
@@ -394,32 +545,30 @@ export async function executeBrowserAgentTool(
               line: lineIndex + 1,
               column: columnIndex + 1,
               content: line,
+              match: line.slice(columnIndex, columnIndex + query.length),
             })
-
-            if (matches.length >= MAX_SEARCH_RESULTS) {
-              return {
-                ok: true,
-                output: JSON.stringify({
-                  query,
-                  path: scopePath,
-                  matches,
-                  truncated: true,
-                }),
-              }
-            }
 
             searchFrom = columnIndex + query.length
           }
         }
       }
 
+      const totalMatches = matches.length
+      const pagedMatches = matches.slice(offset, offset + maxResults)
+      const hasMore = offset + maxResults < totalMatches
+
       return {
         ok: true,
         output: JSON.stringify({
           query,
           path: scopePath,
-          matches,
-          truncated: false,
+          caseSensitive,
+          useRegex,
+          offset,
+          maxResults,
+          totalMatches,
+          matches: pagedMatches,
+          hasMore,
         }),
       }
     }
@@ -520,6 +669,109 @@ export async function executeBrowserAgentTool(
           language: updatedFile.language,
           bytes: byteLength,
           replacedBytes: new Blob([oldContent]).size,
+        }),
+      }
+    }
+    case 'replace_in_file': {
+      const path = normalizeWorkspacePath(getString(input, 'path'))
+      const query = getRawString(input, 'query')
+      const replacement = getRawString(input, 'replacement')
+      const useRegex = getOptionalBoolean(input, 'useRegex')
+      const caseSensitive = getOptionalBooleanDefault(input, 'caseSensitive', true)
+      const replaceAll = getOptionalBoolean(input, 'replaceAll')
+      const file = context.readFile(path)
+
+      if (!file) {
+        throw new Error(`File not found: ${path}`)
+      }
+
+      if (file.kind === 'asset') {
+        throw new Error(`Cannot replace content in binary asset: ${path}`)
+      }
+
+      if (!query) {
+        throw new Error('query cannot be empty')
+      }
+
+      let content = file.content
+      let replacements = 0
+
+      if (useRegex) {
+        let regex: RegExp
+
+        try {
+          regex = new RegExp(query, `${replaceAll ? 'g' : ''}${caseSensitive ? '' : 'i'}`)
+        } catch (error) {
+          const message = error instanceof Error ? error.message : 'Invalid regular expression'
+          throw new Error(message)
+        }
+
+        const countRegex = new RegExp(query, `g${caseSensitive ? '' : 'i'}`)
+        let match = countRegex.exec(file.content)
+
+        while (match) {
+          replacements += 1
+
+          if (!replaceAll) {
+            break
+          }
+
+          if (match[0] === '') {
+            countRegex.lastIndex += 1
+          }
+
+          match = countRegex.exec(file.content)
+        }
+
+        content = file.content.replace(regex, replacement)
+      } else {
+        const searchableContent = caseSensitive ? file.content : file.content.toLowerCase()
+        const searchableQuery = caseSensitive ? query : query.toLowerCase()
+        const parts: string[] = []
+        let cursor = 0
+        let searchFrom = 0
+
+        while (searchFrom <= searchableContent.length) {
+          const matchIndex = searchableContent.indexOf(searchableQuery, searchFrom)
+
+          if (matchIndex === -1) {
+            break
+          }
+
+          parts.push(file.content.slice(cursor, matchIndex), replacement)
+          replacements += 1
+          cursor = matchIndex + query.length
+          searchFrom = cursor
+
+          if (!replaceAll) {
+            break
+          }
+        }
+
+        if (replacements > 0) {
+          parts.push(file.content.slice(cursor))
+          content = parts.join('')
+        }
+      }
+
+      if (replacements === 0) {
+        throw new Error(`query was not found in ${path}`)
+      }
+
+      const byteLength = new Blob([content]).size
+
+      if (byteLength > MAX_FILE_BYTES) {
+        throw new Error('File content is too large')
+      }
+
+      const updatedFile = await context.writeFile(path, content)
+      return {
+        ok: true,
+        output: JSON.stringify({
+          path: updatedFile.path,
+          language: updatedFile.language,
+          bytes: byteLength,
+          replacements,
         }),
       }
     }
