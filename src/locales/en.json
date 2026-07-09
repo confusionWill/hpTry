@@ -38,6 +38,7 @@
     "send": "Send",
     "sending": "Sending",
     "stop": "Stop",
+    "stopping": "Stopping",
     "stopped": "Generation stopped.",
     "upload": {
       "selectFiles": "Upload assets",

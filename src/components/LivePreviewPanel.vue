@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import PreviewAspectRatioSelect from '@/components/PreviewAspectRatioSelect.vue'
@@ -53,6 +53,7 @@ import type { WorkspaceFile } from '@/types/agent'
 const store = useAgentStore()
 const { t } = useI18n()
 const previewWorkerReady = ref(false)
+const committedPreviewVersion = ref('0')
 
 const selectedAspectRatio = ref('none')
 
@@ -98,7 +99,7 @@ const indexFile = computed(() => {
 
 const previewPathLabel = computed(() => indexFile.value?.path ?? t('workspace.livePreview.noEntry'))
 
-const previewVersion = computed(() =>
+const latestWorkspaceVersion = computed(() =>
   store.workspaceFiles
     .map((file) => file.updatedAt)
     .reduce((latest, updatedAt) => Math.max(latest, updatedAt), 0)
@@ -112,12 +113,26 @@ const previewUrl = computed(() => {
 
   return `/preview/${encodeURIComponent(store.selectedProjectId)}/${encodePreviewPath(
     indexFile.value.path,
-  )}?v=${encodeURIComponent(previewVersion.value)}`
+  )}?v=${encodeURIComponent(committedPreviewVersion.value)}`
 })
 
 onMounted(async () => {
   previewWorkerReady.value = await registerPreviewWorker()
 })
+
+watch(
+  [latestWorkspaceVersion, () => store.isSelectedProjectRunning, () => store.selectedProjectId],
+  ([latestVersion, isRunning], [, wasRunning]) => {
+    if (isRunning) {
+      return
+    }
+
+    if (wasRunning || committedPreviewVersion.value !== latestVersion) {
+      committedPreviewVersion.value = latestVersion
+    }
+  },
+  { immediate: true },
+)
 
 function encodePreviewPath(path: string): string {
   return normalizePath(path).split('/').map(encodeURIComponent).join('/')

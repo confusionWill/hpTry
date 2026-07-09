@@ -38,6 +38,7 @@
     "send": "发送",
     "sending": "发送中",
     "stop": "停止",
+    "stopping": "停止中",
     "stopped": "已停止生成。",
     "upload": {
       "selectFiles": "上传资源",

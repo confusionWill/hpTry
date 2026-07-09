@@ -5,6 +5,7 @@ import {
   runAgentConversation,
   type AgentRunContext,
 } from '@/services/agent/runner'
+import { ChatCompletionRequestError } from '@/services/openai'
 import {
   deleteRecord,
   deleteRecordsByIndex,
@@ -82,6 +83,12 @@ function saveSelectedProviderId(providerId: string): void {
   localStorage.removeItem(SELECTED_PROVIDER_STORAGE_KEY)
 }
 
+function throwIfAborted(signal: AbortSignal) {
+  if (signal.aborted) {
+    throw new ChatCompletionRequestError('aborted', 'Request was canceled')
+  }
+}
+
 export const useAgentStore = defineStore('agent', {
   state: () => ({
     projects: [] as Project[],
@@ -97,6 +104,7 @@ export const useAgentStore = defineStore('agent', {
     loading: false,
     exportingZip: false,
     activeRuns: [] as ActiveAgentRun[],
+    stoppingConversationIds: [] as string[],
     projectLoadToken: 0,
     conversationLoadToken: 0,
   }),
@@ -133,6 +141,16 @@ export const useAgentStore = defineStore('agent', {
       return (
         Boolean(state.selectedProjectId) &&
         state.activeRuns.some((run) => run.projectId === state.selectedProjectId)
+      )
+    },
+    isSelectedProjectStopping(state): boolean {
+      return (
+        Boolean(state.selectedProjectId) &&
+        state.activeRuns.some(
+          (run) =>
+            run.projectId === state.selectedProjectId &&
+            state.stoppingConversationIds.includes(run.conversationId),
+        )
       )
     },
     isSelectedConversationRunning(state): boolean {
@@ -273,6 +291,11 @@ export const useAgentStore = defineStore('agent', {
         return
       }
 
+      if (this.stoppingConversationIds.includes(run.conversationId)) {
+        return
+      }
+
+      this.stoppingConversationIds = [...this.stoppingConversationIds, run.conversationId]
       activeRunControllers.get(run.conversationId)?.abort()
     },
     stopSelectedProjectRun() {
@@ -616,8 +639,12 @@ export const useAgentStore = defineStore('agent', {
               userMessage: content,
               signal: abortController.signal,
             })
+            throwIfAborted(abortController.signal)
             await this.updateConversationTitle(runConversation.id, title)
-          } catch {
+          } catch (error) {
+            if (abortController.signal.aborted) {
+              throw error
+            }
             // Keep the draft title if title generation fails.
           }
         }
@@ -639,6 +666,7 @@ export const useAgentStore = defineStore('agent', {
           },
         })
 
+        throwIfAborted(abortController.signal)
         const responseEndedAt = now()
         const assistantMessage: ChatMessage = {
           id: createId('message'),
@@ -680,6 +708,9 @@ export const useAgentStore = defineStore('agent', {
 
         this.activeRuns = this.activeRuns.filter(
           (run) => run.conversationId !== runConversation.id,
+        )
+        this.stoppingConversationIds = this.stoppingConversationIds.filter(
+          (conversationId) => conversationId !== runConversation.id,
         )
         activeRunControllers.delete(runConversation.id)
       }

@@ -101,7 +101,21 @@ export async function requestChatCompletion(params: {
     params.signal?.removeEventListener('abort', abortRequest)
   }
 
+  if (params.signal?.aborted || controller.signal.aborted) {
+    throw new ChatCompletionRequestError(
+      timedOut ? 'timeout' : 'aborted',
+      timedOut ? 'Request timed out' : 'Request was canceled',
+    )
+  }
+
   const payload = (await response.json()) as ChatCompletionResponse
+
+  if (params.signal?.aborted || controller.signal.aborted) {
+    throw new ChatCompletionRequestError(
+      timedOut ? 'timeout' : 'aborted',
+      timedOut ? 'Request timed out' : 'Request was canceled',
+    )
+  }
 
   if (!response.ok) {
     throw new Error(payload.error?.message ?? response.statusText)

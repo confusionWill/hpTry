@@ -56,16 +56,21 @@
     </UiButton>
     <UiButton
       :danger="currentProjectRunning"
-      :disabled="(!draft.trim() && uploadedAssets.length === 0) || isUploadingFiles"
+      :disabled="composerActionDisabled"
       :loading="isUploadingFiles"
       variant="primary"
       @click="handleComposerAction"
     >
       <template #icon>
-        <Square v-if="currentProjectRunning" :size="14" />
+        <Square
+          v-if="currentProjectRunning"
+          class="agent-composer__stop-icon"
+          :class="{ 'agent-composer__stop-icon--stopping': currentProjectStopping }"
+          :size="14"
+        />
         <Send v-else :size="16" />
       </template>
-      {{ currentProjectRunning ? t('conversation.stop') : t('conversation.send') }}
+      {{ composerActionLabel }}
     </UiButton>
   </div>
 </template>
@@ -102,6 +107,29 @@ let dragDepth = 0
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const currentProjectRunning = computed(() => store.isSelectedProjectRunning)
+const currentProjectStopping = computed(() => store.isSelectedProjectStopping)
+const composerActionDisabled = computed(() => {
+  if (isUploadingFiles.value) {
+    return true
+  }
+
+  if (currentProjectStopping.value) {
+    return true
+  }
+
+  if (currentProjectRunning.value) {
+    return false
+  }
+
+  return !draft.value.trim() && uploadedAssets.value.length === 0
+})
+const composerActionLabel = computed(() => {
+  if (currentProjectStopping.value) {
+    return t('conversation.stopping')
+  }
+
+  return currentProjectRunning.value ? t('conversation.stop') : t('conversation.send')
+})
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -355,6 +383,10 @@ async function send() {
 }
 
 function handleComposerAction() {
+  if (currentProjectStopping.value) {
+    return
+  }
+
   if (currentProjectRunning.value) {
     store.stopSelectedProjectRun()
     return
@@ -404,6 +436,21 @@ function handleComposerAction() {
   min-width: 0;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.agent-composer__stop-icon--stopping {
+  animation: agent-composer-stop-bounce 0.8s ease-in-out infinite;
+}
+
+@keyframes agent-composer-stop-bounce {
+  0%,
+  100% {
+    transform: translateY(2px);
+  }
+
+  50% {
+    transform: translateY(-2px);
+  }
 }
 
 .uploaded-asset {

@@ -1,5 +1,9 @@
 import { executeBrowserAgentTool, hpTryTools } from '@/services/agent/tools'
-import { requestChatCompletion, type ChatMessageParam } from '@/services/openai'
+import {
+  ChatCompletionRequestError,
+  requestChatCompletion,
+  type ChatMessageParam,
+} from '@/services/openai'
 import type {
   Conversation,
   ConversationEvent,
@@ -84,14 +88,23 @@ function buildToolResultContent(ok: boolean, output: string, error = ''): string
   })
 }
 
+function throwIfAborted(signal?: AbortSignal) {
+  if (signal?.aborted) {
+    throw new ChatCompletionRequestError('aborted', 'Request was canceled')
+  }
+}
+
 async function executeToolCall(
   toolCall: ToolCall,
   runContext: AgentRunContext,
   handlers: AgentRunHandlers,
+  signal?: AbortSignal,
 ): Promise<ChatMessageParam> {
+  throwIfAborted(signal)
   const run = await handlers.createToolRun(toolCall)
 
   try {
+    throwIfAborted(signal)
     const result = await executeBrowserAgentTool(toolCall, {
       project: runContext.project,
       conversationId: runContext.conversation.id,
@@ -103,6 +116,7 @@ async function executeToolCall(
       renameFile: handlers.renameFile,
     })
 
+    throwIfAborted(signal)
     await handlers.updateToolRun(run, {
       status: 'success',
       output: result.output,
@@ -116,6 +130,15 @@ async function executeToolCall(
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Tool execution failed'
+
+    if (signal?.aborted) {
+      await handlers.updateToolRun(run, {
+        status: 'error',
+        output: '',
+        error: message,
+      })
+      throw new ChatCompletionRequestError('aborted', 'Request was canceled')
+    }
 
     await handlers.updateToolRun(run, {
       status: 'error',
@@ -141,6 +164,7 @@ export async function runAgentConversation(params: {
   const agentMessages = toChatMessages(params.systemPrompt, params.events)
 
   for (let round = 0; round < MAX_AGENT_TOOL_ROUNDS; round += 1) {
+    throwIfAborted(params.signal)
     const response = await requestChatCompletion({
       provider: params.runContext.provider,
       messages: agentMessages,
@@ -148,6 +172,7 @@ export async function runAgentConversation(params: {
       toolChoice: 'auto',
       signal: params.signal,
     })
+    throwIfAborted(params.signal)
     const toolCalls = response.message.tool_calls ?? []
 
     if (toolCalls.length === 0) {
@@ -161,7 +186,13 @@ export async function runAgentConversation(params: {
     })
 
     for (const toolCall of toolCalls) {
-      const toolMessage = await executeToolCall(toolCall, params.runContext, params.handlers)
+      const toolMessage = await executeToolCall(
+        toolCall,
+        params.runContext,
+        params.handlers,
+        params.signal,
+      )
+      throwIfAborted(params.signal)
       agentMessages.push(toolMessage)
     }
   }
