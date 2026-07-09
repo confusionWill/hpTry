@@ -8,6 +8,21 @@
 
       <div class="live-preview__actions">
         <PreviewAspectRatioSelect v-model="selectedAspectRatio" />
+        <UiButton
+          :aria-label="
+            isPreviewFullscreen
+              ? t('workspace.livePreview.exitFullscreen')
+              : t('workspace.livePreview.enterFullscreen')
+          "
+          :disabled="!canUseFullscreen"
+          circle
+          @click="togglePreviewFullscreen"
+        >
+          <template #icon>
+            <Minimize2 v-if="isPreviewFullscreen" :size="16" />
+            <Maximize2 v-else :size="16" />
+          </template>
+        </UiButton>
         <WorkspaceExportButton />
       </div>
     </header>
@@ -30,9 +45,12 @@
         :style="previewViewportStyle"
       >
         <iframe
+          ref="previewFrameRef"
           :key="previewUrl"
+          allowfullscreen
           class="live-preview__frame"
           :src="previewUrl"
+          tabindex="-1"
           :title="t('workspace.livePreview.title')"
         />
       </div>
@@ -41,10 +59,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { Maximize2, Minimize2 } from '@lucide/vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import PreviewAspectRatioSelect from '@/components/PreviewAspectRatioSelect.vue'
+import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import WorkspaceExportButton from '@/components/WorkspaceExportButton.vue'
 import { useAgentStore } from '@/stores/agent'
@@ -54,6 +74,8 @@ const store = useAgentStore()
 const { t } = useI18n()
 const previewWorkerReady = ref(false)
 const committedPreviewVersion = ref('0')
+const previewFrameRef = ref<HTMLIFrameElement | null>(null)
+const isPreviewFullscreen = ref(false)
 
 const selectedAspectRatio = ref('none')
 
@@ -66,6 +88,13 @@ const aspectRatioMap: Record<string, number | null> = {
 }
 
 const selectedAspectRatioValue = computed(() => aspectRatioMap[selectedAspectRatio.value] ?? null)
+const canUseFullscreen = computed(
+  () =>
+    Boolean(indexFile.value) &&
+    previewWorkerReady.value &&
+    document.fullscreenEnabled &&
+    Boolean(previewFrameRef.value?.requestFullscreen),
+)
 
 const previewViewportStyle = computed<Partial<Record<string, string>>>(() => {
   if (selectedAspectRatioValue.value === null) {
@@ -118,6 +147,11 @@ const previewUrl = computed(() => {
 
 onMounted(async () => {
   previewWorkerReady.value = await registerPreviewWorker()
+  document.addEventListener('fullscreenchange', syncFullscreenState)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('fullscreenchange', syncFullscreenState)
 })
 
 watch(
@@ -155,6 +189,38 @@ function normalizePath(path: string): string {
   }
 
   return parts.join('/')
+}
+
+async function togglePreviewFullscreen() {
+  if (!canUseFullscreen.value) {
+    return
+  }
+
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen()
+      return
+    }
+
+    await previewFrameRef.value?.requestFullscreen()
+    focusPreviewFrame()
+  } catch {
+    syncFullscreenState()
+  }
+}
+
+function syncFullscreenState() {
+  isPreviewFullscreen.value = document.fullscreenElement === previewFrameRef.value
+
+  if (isPreviewFullscreen.value) {
+    focusPreviewFrame()
+  }
+}
+
+function focusPreviewFrame() {
+  requestAnimationFrame(() => {
+    previewFrameRef.value?.focus()
+  })
 }
 
 async function registerPreviewWorker(): Promise<boolean> {

@@ -123,6 +123,8 @@
       "noEntry": "Waiting for hp.html",
       "aspectRatio": "Ratio",
       "aspectRatioNone": "None",
+      "enterFullscreen": "Preview fullscreen",
+      "exitFullscreen": "Exit fullscreen",
       "missingIndex": "The workspace needs hp.html to preview",
       "unavailable": "This browser does not support the live preview service"
     },

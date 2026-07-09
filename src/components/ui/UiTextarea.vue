@@ -50,6 +50,14 @@ function handleInput(event: Event) {
   void nextTick(resizeTextarea)
 }
 
+function focus() {
+  textareaRef.value?.focus()
+}
+
+defineExpose({
+  focus,
+})
+
 watch(
   () => model.value,
   () => {

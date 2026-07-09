@@ -14,7 +14,7 @@
     <template v-else>
       <section class="workspace__preview">
         <LivePreviewPanel />
-        <AgentComposer />
+        <AgentComposer ref="composerRef" />
       </section>
 
       <ChatPanel />
@@ -25,7 +25,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import AgentComposer from '@/components/AgentComposer.vue'
@@ -40,10 +40,25 @@ import { useAgentStore } from '@/stores/agent'
 const store = useAgentStore()
 const { t } = useI18n()
 const providerDialogVisible = ref(false)
+const composerRef = ref<InstanceType<typeof AgentComposer> | null>(null)
 
 onMounted(() => {
-  void store.load()
+  void store.load().then(focusComposer)
 })
+
+function focusComposer() {
+  void nextTick(() => {
+    composerRef.value?.focusComposer()
+  })
+}
+
+watch(
+  () => [
+    store.selectedConversationId,
+    store.isDraftConversationActive ? store.draftConversationProjectId : '',
+  ],
+  focusComposer,
+)
 </script>
 
 <style scoped>

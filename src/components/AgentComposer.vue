@@ -18,6 +18,7 @@
     />
     <div class="agent-composer__main">
       <UiTextarea
+        ref="textareaRef"
         v-model="draft"
         autosize
         :disabled="isUploadingFiles"
@@ -101,6 +102,7 @@ const { t } = useI18n()
 const draft = ref('')
 const uploadedAssets = ref<UploadedAsset[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
+const textareaRef = ref<InstanceType<typeof UiTextarea> | null>(null)
 const isDraggingFiles = ref(false)
 const isUploadingFiles = ref(false)
 let dragDepth = 0
@@ -142,6 +144,18 @@ function formatBytes(bytes: number): string {
 function openFilePicker() {
   fileInputRef.value?.click()
 }
+
+function focusComposer() {
+  if (!canChat.value || isUploadingFiles.value) {
+    return
+  }
+
+  textareaRef.value?.focus()
+}
+
+defineExpose({
+  focusComposer,
+})
 
 function handleDragEnter(event: DragEvent) {
   if (!hasDraggedFiles(event)) {
