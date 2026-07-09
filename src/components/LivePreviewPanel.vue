@@ -183,7 +183,6 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
 }
 

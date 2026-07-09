@@ -12,7 +12,10 @@
     </section>
 
     <template v-else>
-      <LivePreviewPanel />
+      <section class="workspace__preview">
+        <LivePreviewPanel />
+        <AgentComposer />
+      </section>
 
       <ChatPanel />
     </template>
@@ -25,6 +28,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import AgentComposer from '@/components/AgentComposer.vue'
 import ChatPanel from '@/components/ChatPanel.vue'
 import LivePreviewPanel from '@/components/LivePreviewPanel.vue'
 import ProjectConversationSidebar from '@/components/ProjectConversationSidebar.vue'
@@ -52,6 +56,15 @@ onMounted(() => {
 }
 
 .workspace__left {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--ui-border-color-light);
+  background: var(--ui-bg-color);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.workspace__preview {
   display: grid;
   min-width: 0;
   min-height: 0;
