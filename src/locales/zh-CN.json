@@ -34,6 +34,10 @@
     "namePlaceholder": "会话标题",
     "empty": "暂无会话",
     "selectEmpty": "选择或创建一个会话",
+    "panel": {
+      "collapse": "收起对话面板",
+      "expand": "展开对话面板"
+    },
     "inputPlaceholder": "输入消息，按 Enter 发送，Shift + Enter 换行",
     "send": "发送",
     "sending": "发送中",

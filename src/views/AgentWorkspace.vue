@@ -1,5 +1,5 @@
 <template>
-  <main class="workspace">
+  <main class="workspace" :class="{ 'workspace--chat-collapsed': chatPanelCollapsed }">
     <aside class="workspace__left">
       <ProjectConversationSidebar @open-providers="providerDialogVisible = true" />
       <WorkspacePanel />
@@ -17,7 +17,10 @@
         <AgentComposer ref="composerRef" />
       </section>
 
-      <ChatPanel />
+      <ChatPanel
+        :collapsed="chatPanelCollapsed"
+        @toggle-collapsed="chatPanelCollapsed = !chatPanelCollapsed"
+      />
     </template>
 
     <ProviderManager v-model="providerDialogVisible" />
@@ -40,6 +43,7 @@ import { useAgentStore } from '@/stores/agent'
 const store = useAgentStore()
 const { t } = useI18n()
 const providerDialogVisible = ref(false)
+const chatPanelCollapsed = ref(false)
 const composerRef = ref<InstanceType<typeof AgentComposer> | null>(null)
 
 onMounted(() => {
@@ -68,6 +72,15 @@ watch(
   width: 100%;
   height: 100%;
   overflow: hidden;
+  transition: grid-template-columns 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:global(.hero-view-transition) .workspace {
+  transition: none;
+}
+
+.workspace--chat-collapsed {
+  grid-template-columns: 320px minmax(320px, 1fr) 64px;
 }
 
 .workspace__left {
@@ -86,6 +99,7 @@ watch(
   border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
   grid-template-rows: minmax(0, 1fr) auto;
+  view-transition-name: workspace-preview;
 }
 
 .project-empty {
@@ -105,6 +119,16 @@ watch(
   .workspace {
     grid-template-columns: 320px 420px 240px;
     overflow: auto;
+  }
+
+  .workspace--chat-collapsed {
+    grid-template-columns: 320px 420px 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace {
+    transition: none;
   }
 }
 </style>

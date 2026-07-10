@@ -34,6 +34,10 @@
     "namePlaceholder": "Conversation title",
     "empty": "No conversations",
     "selectEmpty": "Select or create a conversation",
+    "panel": {
+      "collapse": "Collapse conversation panel",
+      "expand": "Expand conversation panel"
+    },
     "inputPlaceholder": "Type a message, Enter to send, Shift + Enter for newline",
     "send": "Send",
     "sending": "Sending",

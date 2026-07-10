@@ -1,116 +1,155 @@
 <template>
-  <section class="chat-panel">
+  <section class="chat-panel" :class="{ 'chat-panel--collapsed': collapsed }">
     <div class="chat-panel__header">
-      <div>
+      <div v-if="!collapsed">
         <h1>{{ conversationTitle }}</h1>
         <p v-if="store.selectedProject">
           {{ store.selectedProject.name }}
         </p>
       </div>
+      <UiButton
+        :aria-label="
+          collapsed ? t('conversation.panel.expand') : t('conversation.panel.collapse')
+        "
+        circle
+        text
+        class="chat-panel__collapse"
+        :disabled="isTransitioning"
+        @click="toggleCollapsed"
+      >
+        <template #icon>
+          <ChevronLeft v-if="collapsed" :size="18" />
+          <ChevronRight v-else :size="18" />
+        </template>
+      </UiButton>
     </div>
 
-    <div v-if="!canChat" class="empty-state">
+    <div v-if="!collapsed && !canChat" class="empty-state">
       <UiEmpty :description="t('conversation.selectEmpty')" />
     </div>
 
-    <template v-else>
+    <div v-else-if="collapsed && canChat" class="chat-panel__avatar-list">
+      <span
+        v-for="bubble in conversationBubbles"
+        :key="bubble.id"
+        class="message-avatar"
+        :class="`message-avatar--${bubble.type}`"
+        :style="avatarTransitionStyle(bubble.id)"
+        aria-hidden="true"
+      />
+    </div>
+
+    <template v-else-if="!collapsed">
       <div class="chat-panel__body">
         <div class="chat-panel__conversation">
           <div class="messages">
             <template v-for="bubble in conversationBubbles" :key="bubble.id">
-              <article
+              <div
                 v-if="bubble.type === 'user'"
-                class="message"
-                :class="`message--${bubble.message.role}`"
+                class="message-row message-row--user"
               >
-                <MarkdownPreview :content="bubble.message.content" />
-              </article>
+                <article class="message" :class="`message--${bubble.message.role}`">
+                  <MarkdownPreview :content="bubble.message.content" />
+                </article>
+                <span
+                  class="message-avatar message-avatar--user"
+                  :style="avatarTransitionStyle(bubble.id)"
+                  aria-hidden="true"
+                />
+              </div>
 
-              <article v-else class="message message--assistant">
-                <div v-if="bubble.message" class="message__actions">
-                  <UiButton
-                    circle
-                    text
-                    class="message__toggle"
-                    :aria-label="
-                      isSourceVisible(bubble.message.id)
-                        ? t('conversation.previewMarkdown')
-                        : t('conversation.viewMarkdownSource')
-                    "
-                    @click="toggleSource(bubble.message.id)"
-                  >
-                    <template #icon>
-                      <Eye v-if="isSourceVisible(bubble.message.id)" :size="15" />
-                      <Code2 v-else :size="15" />
-                    </template>
-                  </UiButton>
-                </div>
-
-                <details
-                  v-if="bubble.tools.length > 0"
-                  class="message__tools"
-                  :open="hasRunningTool(bubble.tools)"
-                >
-                  <summary class="message__tools-summary">
-                    <span>{{ t('conversation.toolGroup', { count: bubble.tools.length }) }}</span>
-                    <span>{{ summarizeToolGroup(bubble.tools) }}</span>
-                  </summary>
-                  <div class="message__tools-list">
-                    <article
-                      v-for="tool in bubble.tools"
-                      :key="tool.id"
-                      class="tool-event"
-                      :class="`tool-event--${tool.status}`"
+              <div v-else class="message-row message-row--assistant">
+                <span
+                  class="message-avatar message-avatar--assistant"
+                  :style="avatarTransitionStyle(bubble.id)"
+                  aria-hidden="true"
+                />
+                <article class="message message--assistant">
+                  <div v-if="bubble.message" class="message__actions">
+                    <UiButton
+                      circle
+                      text
+                      class="message__toggle"
+                      :aria-label="
+                        isSourceVisible(bubble.message.id)
+                          ? t('conversation.previewMarkdown')
+                          : t('conversation.viewMarkdownSource')
+                      "
+                      @click="toggleSource(bubble.message.id)"
                     >
-                      <details class="tool-event__details" :open="tool.status === 'running'">
-                        <summary>
-                          <span class="tool-event__name">
-                            {{ t('conversation.toolCall', { name: tool.toolName }) }}
-                          </span>
-                          <span class="tool-event__summary">
-                            {{ summarizeToolEvent(tool) }}
-                          </span>
-                          <span class="tool-event__status">
-                            {{ t(`workspace.toolStatus.${tool.status}`) }}
-                          </span>
-                        </summary>
-                        <div class="tool-event__body">
-                          <section>
-                            <h3>{{ t('conversation.toolInput') }}</h3>
-                            <pre>{{ formatToolPayload(tool.input) }}</pre>
-                          </section>
-                          <section v-if="tool.error">
-                            <h3>{{ t('conversation.toolError') }}</h3>
-                            <pre>{{ tool.error }}</pre>
-                          </section>
-                          <section v-else-if="tool.output">
-                            <h3>{{ t('conversation.toolOutput') }}</h3>
-                            <pre>{{ formatToolPayload(tool.output) }}</pre>
-                          </section>
-                        </div>
-                      </details>
-                    </article>
+                      <template #icon>
+                        <Eye v-if="isSourceVisible(bubble.message.id)" :size="15" />
+                        <Code2 v-else :size="15" />
+                      </template>
+                    </UiButton>
                   </div>
-                </details>
 
-                <template v-if="bubble.message">
-                  <pre
-                    v-if="isSourceVisible(bubble.message.id)"
-                    class="message__source"
-                  >{{ bubble.message.content }}</pre>
-                  <MarkdownPreview v-else :content="bubble.message.content" />
-                  <span
-                    v-if="bubble.message.responseDurationMs !== undefined"
-                    class="message__answer-duration"
+                  <details
+                    v-if="bubble.tools.length > 0"
+                    class="message__tools"
+                    :open="hasRunningTool(bubble.tools)"
                   >
-                    {{
-                      t('conversation.answerDuration', {
-                        duration: formatAnswerDuration(bubble.message.responseDurationMs),
-                      })
-                    }}
-                  </span>
-                </template>
-              </article>
+                    <summary class="message__tools-summary">
+                      <span>{{ t('conversation.toolGroup', { count: bubble.tools.length }) }}</span>
+                      <span>{{ summarizeToolGroup(bubble.tools) }}</span>
+                    </summary>
+                    <div class="message__tools-list">
+                      <article
+                        v-for="tool in bubble.tools"
+                        :key="tool.id"
+                        class="tool-event"
+                        :class="`tool-event--${tool.status}`"
+                      >
+                        <details class="tool-event__details" :open="tool.status === 'running'">
+                          <summary>
+                            <span class="tool-event__name">
+                              {{ t('conversation.toolCall', { name: tool.toolName }) }}
+                            </span>
+                            <span class="tool-event__summary">
+                              {{ summarizeToolEvent(tool) }}
+                            </span>
+                            <span class="tool-event__status">
+                              {{ t(`workspace.toolStatus.${tool.status}`) }}
+                            </span>
+                          </summary>
+                          <div class="tool-event__body">
+                            <section>
+                              <h3>{{ t('conversation.toolInput') }}</h3>
+                              <pre>{{ formatToolPayload(tool.input) }}</pre>
+                            </section>
+                            <section v-if="tool.error">
+                              <h3>{{ t('conversation.toolError') }}</h3>
+                              <pre>{{ tool.error }}</pre>
+                            </section>
+                            <section v-else-if="tool.output">
+                              <h3>{{ t('conversation.toolOutput') }}</h3>
+                              <pre>{{ formatToolPayload(tool.output) }}</pre>
+                            </section>
+                          </div>
+                        </details>
+                      </article>
+                    </div>
+                  </details>
+
+                  <template v-if="bubble.message">
+                    <pre
+                      v-if="isSourceVisible(bubble.message.id)"
+                      class="message__source"
+                    >{{ bubble.message.content }}</pre>
+                    <MarkdownPreview v-else :content="bubble.message.content" />
+                    <span
+                      v-if="bubble.message.responseDurationMs !== undefined"
+                      class="message__answer-duration"
+                    >
+                      {{
+                        t('conversation.answerDuration', {
+                          duration: formatAnswerDuration(bubble.message.responseDurationMs),
+                        })
+                      }}
+                    </span>
+                  </template>
+                </article>
+              </div>
             </template>
           </div>
         </div>
@@ -120,8 +159,8 @@
 </template>
 
 <script setup lang="ts">
-import { Code2, Eye } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { ChevronLeft, ChevronRight, Code2, Eye } from '@lucide/vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
@@ -143,9 +182,18 @@ type ConversationBubble =
       message?: ConversationMessageEvent
     }
 
+defineProps<{
+  collapsed: boolean
+}>()
+
+const emit = defineEmits<{
+  toggleCollapsed: []
+}>()
+
 const store = useAgentStore()
 const { t } = useI18n()
 const sourceMessageIds = ref<Set<string>>(new Set())
+const isTransitioning = ref(false)
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const conversationBubbles = computed<ConversationBubble[]>(() => {
@@ -194,6 +242,39 @@ const conversationTitle = computed(() => {
 
   return t('conversation.selectEmpty')
 })
+
+function avatarTransitionStyle(bubbleId: string): Record<string, string> {
+  return {
+    viewTransitionName: `conversation-avatar-${bubbleId.replace(/[^a-zA-Z0-9_-]/g, '-')}`,
+  }
+}
+
+async function toggleCollapsed() {
+  if (isTransitioning.value) {
+    return
+  }
+
+  const updateCollapsedState = async () => {
+    emit('toggleCollapsed')
+    await nextTick()
+  }
+
+  if (!document.startViewTransition) {
+    await updateCollapsedState()
+    return
+  }
+
+  isTransitioning.value = true
+  document.documentElement.classList.add('hero-view-transition')
+
+  try {
+    const transition = document.startViewTransition(updateCollapsedState)
+    await transition.finished.catch(() => undefined)
+  } finally {
+    document.documentElement.classList.remove('hero-view-transition')
+    isTransitioning.value = false
+  }
+}
 
 function formatAnswerDuration(durationMs: number): string {
   if (durationMs < 1000) {
@@ -400,6 +481,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   flex: 1;
   flex-direction: column;
   background: var(--ui-bg-color);
+  view-transition-name: chat-panel-shell;
 }
 
 .chat-panel__header {
@@ -422,6 +504,34 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   margin: 4px 0 0;
   color: var(--ui-text-color-secondary);
   font-size: 13px;
+}
+
+.chat-panel__collapse {
+  flex: 0 0 auto;
+  color: var(--ui-text-color-secondary);
+  view-transition-name: chat-panel-toggle;
+}
+
+.chat-panel--collapsed .chat-panel__header {
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.chat-panel__avatar-list {
+  display: flex;
+  min-height: 0;
+  align-items: center;
+  flex: 1;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 18px;
+}
+
+.chat-panel__avatar-list,
+.chat-panel__body,
+.empty-state {
+  animation: chat-panel-content-enter 260ms ease-out both;
 }
 
 .empty-state {
@@ -454,6 +564,50 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   gap: 12px;
   overflow: auto;
   padding: 18px;
+}
+
+.message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.message-row--user {
+  justify-content: flex-end;
+}
+
+.message-row--assistant {
+  justify-content: flex-start;
+}
+
+.message-avatar {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border-radius: 50%;
+}
+
+.message-avatar--user {
+  background: #9ca3af;
+}
+
+.message-avatar--assistant {
+  background: #22c55e;
+}
+
+@keyframes chat-panel-content-enter {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-panel__avatar-list,
+  .chat-panel__body,
+  .empty-state {
+    animation: none;
+  }
 }
 
 .message {
