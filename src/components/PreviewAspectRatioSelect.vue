@@ -92,6 +92,11 @@ const aspectRatioOptions = computed<AspectRatioOption[]>(() => [
     ratio: 3 / 4,
     value: '3-4',
   },
+  {
+    label: '21:9',
+    ratio: 21 / 9,
+    value: '21-9',
+  },
 ])
 
 const selectedOption = computed(

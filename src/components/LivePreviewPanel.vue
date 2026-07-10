@@ -81,6 +81,7 @@ const selectedAspectRatio = ref('none')
 
 const aspectRatioMap: Record<string, number | null> = {
   '16-9': 16 / 9,
+  '21-9': 21 / 9,
   '9-16': 9 / 16,
   '4-3': 4 / 3,
   '3-4': 3 / 4,
