@@ -15,6 +15,7 @@ import {
   putRecord,
 } from '@/services/db'
 import {
+  clearTemporaryWorkspaceFiles,
   deleteProjectWorkspaceFile,
   deleteProjectWorkspaceDirectory,
   loadProjectWorkspaceFiles,
@@ -166,6 +167,7 @@ export const useAgentStore = defineStore('agent', {
     async load() {
       this.loading = true
       try {
+        await clearTemporaryWorkspaceFiles()
         this.projects = sortUpdated(await getAllRecords('projects'))
         this.providers = sortUpdated(await getAllRecords('providers'))
 
@@ -441,14 +443,18 @@ export const useAgentStore = defineStore('agent', {
 
       return file
     },
-    async uploadFilesToSelectedWorkspace(payloads: WorkspaceUploadPayload[]): Promise<WorkspaceFile[]> {
-      const projectId = this.selectedProjectId
-
+    async uploadFilesToWorkspace(
+      projectId: string,
+      payloads: WorkspaceUploadPayload[],
+    ): Promise<WorkspaceFile[]> {
       if (!projectId || payloads.length === 0) {
         return []
       }
 
-      const files = [...this.workspaceFiles]
+      const files =
+        this.selectedProjectId === projectId
+          ? [...this.workspaceFiles]
+          : await loadProjectWorkspaceFiles(projectId)
       const uploadedFiles: WorkspaceFile[] = []
 
       for (const payload of payloads) {

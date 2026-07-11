@@ -44,12 +44,12 @@
     "stopped": "已停止生成。",
     "upload": {
       "selectFiles": "上传资源",
-      "removeFile": "从本次消息移除 {name}",
-      "uploaded": "已上传 {count} 个资源到工作区。",
+      "removeFile": "删除已上传文件 {name}",
+      "removeFailed": "删除已上传文件失败",
+      "uploaded": "已上传 {count} 个资源到临时区。",
       "failed": "上传失败",
       "missingProject": "请先选择项目。",
-      "messageHeading": "已上传到工作区的资源：",
-      "messageInstruction": "请根据上面的资源路径读取并使用这些文件。"
+      "messageHeading": "临时资源："
     },
     "answerDuration": "回答耗时：{duration}",
     "viewMarkdownSource": "查看原始 Markdown",
@@ -66,8 +66,6 @@
       "generic": "执行工具",
       "listFiles": "列出文件",
       "listFilesWithCount": "列出 {count} 个文件",
-      "readFile": "读取 {path}",
-      "readFileFallback": "读取文件",
       "searchFiles": "搜索文件",
       "searchFilesWithCount": "搜索文件，{count} 个匹配",
       "readFiles": "读取多个文件",
@@ -88,9 +86,7 @@
       "deleteDirectory": "删除目录 {path}",
       "deleteDirectoryFallback": "删除目录",
       "renameDirectory": "重命名目录 {fromPath} -> {toPath}",
-      "renameDirectoryFallback": "重命名目录",
-      "inspectProject": "检查项目",
-      "inspectProjectWithCount": "检查项目，{count} 个文件"
+      "renameDirectoryFallback": "重命名目录"
     },
     "deleteConfirm": "确认删除该会话？"
   },

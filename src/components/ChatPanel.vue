@@ -384,12 +384,6 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
         ? t('conversation.toolSummary.listFiles')
         : t('conversation.toolSummary.listFilesWithCount', { count: files })
     }
-    case 'read_file': {
-      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
-      return path
-        ? t('conversation.toolSummary.readFile', { path })
-        : t('conversation.toolSummary.readFileFallback')
-    }
     case 'search_files': {
       const matches =
         getNumber(outputRecord ?? {}, 'totalMatches') ??
@@ -473,12 +467,6 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
       return fromPath && toPath
         ? t('conversation.toolSummary.renameDirectory', { fromPath, toPath })
         : t('conversation.toolSummary.renameDirectoryFallback')
-    }
-    case 'inspect_project': {
-      const files = Array.isArray(outputRecord?.files) ? outputRecord.files.length : undefined
-      return files === undefined
-        ? t('conversation.toolSummary.inspectProject')
-        : t('conversation.toolSummary.inspectProjectWithCount', { count: files })
     }
     default:
       return t('conversation.toolSummary.generic')

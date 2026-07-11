@@ -14,7 +14,7 @@ import type {
   WorkspaceFile,
 } from '@/types/agent'
 
-const MAX_AGENT_TOOL_ROUNDS = 8
+const MAX_AGENT_TOOL_ROUNDS = 50
 
 export interface AgentRunContext {
   project: Project

@@ -44,12 +44,12 @@
     "stopped": "Generation stopped.",
     "upload": {
       "selectFiles": "Upload assets",
-      "removeFile": "Remove {name} from this message",
-      "uploaded": "Uploaded {count} assets to the workspace.",
+      "removeFile": "Delete uploaded file {name}",
+      "removeFailed": "Failed to delete uploaded file",
+      "uploaded": "Uploaded {count} assets to .tmp.",
       "failed": "Upload failed",
       "missingProject": "Select a project first.",
-      "messageHeading": "Assets uploaded to the workspace:",
-      "messageInstruction": "Use the asset paths above to read and work with these files."
+      "messageHeading": ".tmp assets:"
     },
     "answerDuration": "Answered in {duration}",
     "viewMarkdownSource": "View raw Markdown",
@@ -66,8 +66,6 @@
       "generic": "Run tool",
       "listFiles": "List files",
       "listFilesWithCount": "List {count} files",
-      "readFile": "Read {path}",
-      "readFileFallback": "Read file",
       "searchFiles": "Search files",
       "searchFilesWithCount": "Search files, {count} matches",
       "readFiles": "Read files",
@@ -88,9 +86,7 @@
       "deleteDirectory": "Delete directory {path}",
       "deleteDirectoryFallback": "Delete directory",
       "renameDirectory": "Rename directory {fromPath} -> {toPath}",
-      "renameDirectoryFallback": "Rename directory",
-      "inspectProject": "Inspect project",
-      "inspectProjectWithCount": "Inspect project, {count} files"
+      "renameDirectoryFallback": "Rename directory"
     },
     "deleteConfirm": "Delete this conversation?"
   },

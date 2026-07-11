@@ -115,6 +115,11 @@ function previewWorkspaceFile(path: string) {
   flex: 1;
 }
 
+.workspace-panel__content :deep(.ui-empty) {
+  flex: 1;
+  place-content: center;
+}
+
 .workspace-panel__section-title {
   display: flex;
   width: 100%;

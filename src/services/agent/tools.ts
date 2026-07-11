@@ -42,28 +42,10 @@ export const hpTryTools: ChatTool[] = [
     type: 'function',
     function: {
       name: 'list_files',
-      description: 'List all files in the current browser workspace project.',
+      description: 'List all files in the current browser workspace project with their MIME type and size.',
       parameters: {
         type: 'object',
         properties: {},
-        additionalProperties: false,
-      },
-    },
-  },
-  {
-    type: 'function',
-    function: {
-      name: 'read_file',
-      description: 'Read one file from the current browser workspace project.',
-      parameters: {
-        type: 'object',
-        properties: {
-          path: {
-            type: 'string',
-            description: 'Relative file path, for example src/main.js.',
-          },
-        },
-        required: ['path'],
         additionalProperties: false,
       },
     },
@@ -284,18 +266,6 @@ export const hpTryTools: ChatTool[] = [
       },
     },
   },
-  {
-    type: 'function',
-    function: {
-      name: 'inspect_project',
-      description: 'Inspect the current project, files, and recent tool runs.',
-      parameters: {
-        type: 'object',
-        properties: {},
-        additionalProperties: false,
-      },
-    },
-  },
 ]
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -480,23 +450,14 @@ export async function executeBrowserAgentTool(
 
   switch (toolName) {
     case 'list_files': {
-      const files = context.listFiles().map((file) => file.path)
+      const files = context.listFiles().map((file) => ({
+        path: file.path,
+        mimeType: file.mimeType,
+        bytes: file.size ?? new Blob([file.content]).size,
+      }))
       return {
         ok: true,
         output: JSON.stringify({ files }),
-      }
-    }
-    case 'read_file': {
-      const path = normalizeWorkspacePath(getString(input, 'path'))
-      const file = context.readFile(path)
-
-      if (!file) {
-        throw new Error(`File not found: ${path}`)
-      }
-
-      return {
-        ok: true,
-        output: JSON.stringify(workspaceFilePayload(file)),
       }
     }
     case 'search_files': {
@@ -838,23 +799,6 @@ export async function executeBrowserAgentTool(
       return {
         ok: true,
         output: JSON.stringify({ fromPath, toPath, movedFiles: files.length }),
-      }
-    }
-    case 'inspect_project': {
-      return {
-        ok: true,
-        output: JSON.stringify({
-          project: {
-            name: context.project.name,
-            description: context.project.description,
-          },
-          files: context.listFiles().map((file) => ({
-            path: file.path,
-            kind: file.kind ?? 'text',
-            mimeType: file.mimeType,
-            bytes: file.size ?? new Blob([file.content]).size,
-          })),
-        }),
       }
     }
     default:

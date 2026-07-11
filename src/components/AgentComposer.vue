@@ -27,16 +27,17 @@
         :placeholder="t('conversation.inputPlaceholder')"
         @keydown.enter.exact.prevent="send"
       />
-      <div v-if="uploadedAssets.length > 0" class="agent-composer__assets">
-        <article v-for="asset in uploadedAssets" :key="asset.path" class="uploaded-asset">
-          <span class="uploaded-asset__name">{{ asset.name }}</span>
+      <div v-if="currentProjectAssets.length > 0" class="agent-composer__assets">
+        <article v-for="asset in currentProjectAssets" :key="asset.path" class="uploaded-asset">
+          <span class="uploaded-asset__name">{{ fileNameForPath(asset.path) }}</span>
           <span class="uploaded-asset__path">{{ asset.path }}</span>
           <UiButton
             circle
             text
             class="uploaded-asset__remove"
-            :aria-label="t('conversation.upload.removeFile', { name: asset.name })"
-            @click="removeUploadedAsset(asset.path)"
+            :aria-label="t('conversation.upload.removeFile', { name: fileNameForPath(asset.path) })"
+            :disabled="isUploadingFiles"
+            @click="removeUploadedAsset(asset)"
           >
             <template #icon>
               <X :size="14" />
@@ -89,9 +90,9 @@ import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 
 interface UploadedAsset {
-  name: string
   path: string
   bytes: number
+  projectId: string
 }
 
 const MAX_TEXT_UPLOAD_BYTES = 120_000
@@ -110,6 +111,9 @@ let dragDepth = 0
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const currentProjectRunning = computed(() => store.isSelectedProjectRunning)
 const currentProjectStopping = computed(() => store.isSelectedProjectStopping)
+const currentProjectAssets = computed(() =>
+  uploadedAssets.value.filter((asset) => asset.projectId === store.selectedProjectId),
+)
 const composerActionDisabled = computed(() => {
   if (isUploadingFiles.value) {
     return true
@@ -123,7 +127,7 @@ const composerActionDisabled = computed(() => {
     return false
   }
 
-  return !draft.value.trim() && uploadedAssets.value.length === 0
+  return !draft.value.trim() && currentProjectAssets.value.length === 0
 })
 const composerActionLabel = computed(() => {
   if (currentProjectStopping.value) {
@@ -139,6 +143,10 @@ function formatBytes(bytes: number): string {
   }
 
   return `${(bytes / 1024).toFixed(1)} KB`
+}
+
+function fileNameForPath(path: string): string {
+  return path.split('/').pop() ?? path
 }
 
 function openFilePicker() {
@@ -202,8 +210,26 @@ function hasDraggedFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files')
 }
 
-function removeUploadedAsset(path: string) {
-  uploadedAssets.value = uploadedAssets.value.filter((asset) => asset.path !== path)
+async function removeUploadedAsset(asset: UploadedAsset) {
+  if (isUploadingFiles.value) {
+    return
+  }
+
+  isUploadingFiles.value = true
+
+  try {
+    const files =
+      store.selectedProjectId === asset.projectId ? [...store.workspaceFiles] : []
+    await store.deleteWorkspaceFile(asset.projectId, files, asset.path)
+    uploadedAssets.value = uploadedAssets.value.filter(
+      (item) => item.projectId !== asset.projectId || item.path !== asset.path,
+    )
+  } catch (error) {
+    const message = error instanceof Error ? error.message : t('conversation.upload.removeFailed')
+    uiStore.showToast(message || t('conversation.upload.removeFailed'), 'error')
+  } finally {
+    isUploadingFiles.value = false
+  }
 }
 
 async function uploadFiles(files: File[]) {
@@ -216,12 +242,15 @@ async function uploadFiles(files: File[]) {
     return
   }
 
+  const projectId = store.selectedProjectId
   isUploadingFiles.value = true
 
   try {
     const existingPaths = new Set([
       ...store.workspaceFiles.map((file) => file.path),
-      ...uploadedAssets.value.map((asset) => asset.path),
+      ...uploadedAssets.value
+        .filter((asset) => asset.projectId === projectId)
+        .map((asset) => asset.path),
     ])
     const payloads = await Promise.all(
       files.map(async (file) => {
@@ -243,15 +272,17 @@ async function uploadFiles(files: File[]) {
         }
       }),
     )
-    const workspaceFiles = await store.uploadFilesToSelectedWorkspace(payloads)
+    const workspaceFiles = await store.uploadFilesToWorkspace(projectId, payloads)
     const uploaded = workspaceFiles.map((file, index) => ({
-      name: files[index]?.name ?? file.path.split('/').pop() ?? file.path,
       path: file.path,
       bytes: files[index]?.size ?? file.size ?? 0,
+      projectId,
     }))
 
     uploadedAssets.value = [...uploadedAssets.value, ...uploaded]
-    uiStore.showToast(t('conversation.upload.uploaded', { count: uploaded.length }), 'success')
+    if (store.selectedProjectId === projectId) {
+      uiStore.showToast(t('conversation.upload.uploaded', { count: uploaded.length }), 'success')
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : t('conversation.upload.failed')
     uiStore.showToast(message || t('conversation.upload.failed'), 'error')
@@ -318,11 +349,11 @@ function uniqueUploadPath(fileName: string, existingPaths: Set<string>): string 
   const extensionIndex = safeName.lastIndexOf('.')
   const baseName = extensionIndex > 0 ? safeName.slice(0, extensionIndex) : safeName
   const extension = extensionIndex > 0 ? safeName.slice(extensionIndex) : ''
-  let path = `assets/uploads/${safeName}`
+  let path = `.tmp/${safeName}`
   let suffix = 2
 
   while (existingPaths.has(path)) {
-    path = `assets/uploads/${baseName}-${suffix}${extension}`
+    path = `.tmp/${baseName}-${suffix}${extension}`
     suffix += 1
   }
 
@@ -343,17 +374,16 @@ function normalizeUploadFileName(fileName: string): string {
 }
 
 function buildMessageContent(content: string): string {
-  if (uploadedAssets.value.length === 0) {
+  if (currentProjectAssets.value.length === 0) {
     return content
   }
 
-  const assetLines = uploadedAssets.value.map(
-    (asset) => `- ${asset.path} (${asset.name}, ${formatBytes(asset.bytes)})`,
+  const assetLines = currentProjectAssets.value.map(
+    (asset) => `- ${asset.path} (${formatBytes(asset.bytes)})`,
   )
   const assetBlock = [
     t('conversation.upload.messageHeading'),
     ...assetLines,
-    t('conversation.upload.messageInstruction'),
   ].join('\n')
 
   return content ? `${content}\n\n${assetBlock}` : assetBlock
@@ -372,7 +402,9 @@ async function send() {
   }
 
   draft.value = ''
-  uploadedAssets.value = []
+  uploadedAssets.value = uploadedAssets.value.filter(
+    (asset) => asset.projectId !== store.selectedProjectId,
+  )
 
   try {
     await store.sendMessage(

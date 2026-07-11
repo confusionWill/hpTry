@@ -1,5 +1,5 @@
 import { languageForPath, normalizeWorkspacePath } from '@/services/agent/tools'
-import { deleteRecord, getRecord, getRecordsByIndex, putRecord } from '@/services/db'
+import { deleteRecord, getAllRecords, getRecord, getRecordsByIndex, putRecord } from '@/services/db'
 import type { WorkspaceAsset, WorkspaceFile } from '@/types/agent'
 import { createId, now } from '@/utils/records'
 
@@ -9,6 +9,19 @@ export function sortWorkspaceFiles(files: WorkspaceFile[]): WorkspaceFile[] {
 
 export async function loadProjectWorkspaceFiles(projectId: string): Promise<WorkspaceFile[]> {
   return sortWorkspaceFiles(await getRecordsByIndex('workspaceFiles', 'projectId', projectId))
+}
+
+export async function clearTemporaryWorkspaceFiles(): Promise<void> {
+  const temporaryFiles = (await getAllRecords('workspaceFiles')).filter((file) =>
+    file.path.startsWith('.tmp/'),
+  )
+
+  for (const file of temporaryFiles) {
+    if (file.assetId) {
+      await deleteRecord('workspaceAssets', file.assetId)
+    }
+    await deleteRecord('workspaceFiles', file.id)
+  }
 }
 
 export async function upsertProjectWorkspaceFile(

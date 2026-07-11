@@ -34,7 +34,9 @@ export async function exportWorkspaceAsZip(project: Project, files: WorkspaceFil
     throw new Error('Failed to create ZIP folder')
   }
 
-  for (const file of files.slice().sort((a, b) => a.path.localeCompare(b.path))) {
+  const exportFiles = files.filter((file) => !file.path.startsWith('.tmp/'))
+
+  for (const file of exportFiles.slice().sort((a, b) => a.path.localeCompare(b.path))) {
     if (file.kind === 'asset') {
       const asset = await loadWorkspaceAsset(file)
 
