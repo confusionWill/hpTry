@@ -186,3 +186,87 @@ export async function renameProjectWorkspaceFile(
 
   return file
 }
+
+export async function deleteProjectWorkspaceDirectory(
+  _projectId: string,
+  files: WorkspaceFile[],
+  path: string,
+): Promise<WorkspaceFile[]> {
+  const normalizedPath = normalizeWorkspacePath(path)
+  const directoryFiles = files.filter((file) => file.path.startsWith(`${normalizedPath}/`))
+
+  if (directoryFiles.length === 0) {
+    throw new Error(`Directory not found or empty: ${normalizedPath}`)
+  }
+
+  for (const file of directoryFiles) {
+    if (file.assetId) {
+      await deleteRecord('workspaceAssets', file.assetId)
+    }
+    await deleteRecord('workspaceFiles', file.id)
+  }
+
+  const deletedIds = new Set(directoryFiles.map((file) => file.id))
+  const nextFiles = files.filter((file) => !deletedIds.has(file.id))
+  files.splice(0, files.length, ...nextFiles)
+  return nextFiles
+}
+
+export async function renameProjectWorkspaceDirectory(
+  _projectId: string,
+  files: WorkspaceFile[],
+  fromPath: string,
+  toPath: string,
+): Promise<WorkspaceFile[]> {
+  const normalizedFromPath = normalizeWorkspacePath(fromPath)
+  const normalizedToPath = normalizeWorkspacePath(toPath)
+
+  if (normalizedFromPath === normalizedToPath) {
+    throw new Error('Source and destination directories must be different')
+  }
+  if (normalizedToPath.startsWith(`${normalizedFromPath}/`)) {
+    throw new Error('Cannot move a directory into itself')
+  }
+
+  const directoryFiles = files.filter((file) => file.path.startsWith(`${normalizedFromPath}/`))
+  if (directoryFiles.length === 0) {
+    throw new Error(`Directory not found or empty: ${normalizedFromPath}`)
+  }
+
+  const sourceIds = new Set(directoryFiles.map((file) => file.id))
+  const moves = directoryFiles.map((file) => ({
+    file,
+    path: `${normalizedToPath}${file.path.slice(normalizedFromPath.length)}`,
+  }))
+  const conflict = moves.find(({ path }) =>
+    files.some((file) => file.path === path && !sourceIds.has(file.id)),
+  )
+  if (conflict) {
+    throw new Error(`Destination file already exists: ${conflict.path}`)
+  }
+
+  const timestamp = now()
+  const movedFiles = new Map<string, WorkspaceFile>()
+  for (const move of moves) {
+    const file: WorkspaceFile = {
+      ...move.file,
+      path: move.path,
+      language: languageForPath(move.path),
+      updatedAt: timestamp,
+    }
+    if (file.assetId) {
+      const asset = await getRecord('workspaceAssets', file.assetId)
+      if (asset) {
+        await putRecord('workspaceAssets', { ...asset, path: move.path, updatedAt: timestamp })
+      }
+    }
+    await putRecord('workspaceFiles', file)
+    movedFiles.set(file.id, file)
+  }
+
+  const nextFiles = sortWorkspaceFiles(
+    files.map((file) => movedFiles.get(file.id) ?? file),
+  )
+  files.splice(0, files.length, ...nextFiles)
+  return moves.map(({ file }) => movedFiles.get(file.id)!)
+}

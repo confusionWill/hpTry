@@ -23,6 +23,8 @@ export interface ToolExecutionContext {
   writeFile: (path: string, content: string) => Promise<WorkspaceFile>
   deleteFile: (path: string) => Promise<void>
   renameFile: (fromPath: string, toPath: string) => Promise<WorkspaceFile>
+  deleteDirectory: (path: string) => Promise<number>
+  renameDirectory: (fromPath: string, toPath: string) => Promise<WorkspaceFile[]>
 }
 
 export interface ToolExecutionResult {
@@ -247,6 +249,35 @@ export const hpTryTools: ChatTool[] = [
             type: 'string',
             description: 'New relative file path.',
           },
+        },
+        required: ['fromPath', 'toPath'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'delete_directory',
+      description: 'Delete a directory and every file under it from the current browser workspace project.',
+      parameters: {
+        type: 'object',
+        properties: { path: { type: 'string', description: 'Relative directory path to delete.' } },
+        required: ['path'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'rename_directory',
+      description: 'Rename or move a directory and every file under it in the current browser workspace project.',
+      parameters: {
+        type: 'object',
+        properties: {
+          fromPath: { type: 'string', description: 'Current relative directory path.' },
+          toPath: { type: 'string', description: 'New relative directory path.' },
         },
         required: ['fromPath', 'toPath'],
         additionalProperties: false,
@@ -793,6 +824,20 @@ export async function executeBrowserAgentTool(
           fromPath,
           toPath: file.path,
         }),
+      }
+    }
+    case 'delete_directory': {
+      const path = normalizeWorkspacePath(getString(input, 'path'))
+      const deletedFiles = await context.deleteDirectory(path)
+      return { ok: true, output: JSON.stringify({ path, deletedFiles }) }
+    }
+    case 'rename_directory': {
+      const fromPath = normalizeWorkspacePath(getString(input, 'fromPath'))
+      const toPath = normalizeWorkspacePath(getString(input, 'toPath'))
+      const files = await context.renameDirectory(fromPath, toPath)
+      return {
+        ok: true,
+        output: JSON.stringify({ fromPath, toPath, movedFiles: files.length }),
       }
     }
     case 'inspect_project': {

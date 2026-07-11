@@ -461,6 +461,19 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
         ? t('conversation.toolSummary.renameFile', { fromPath, toPath })
         : t('conversation.toolSummary.renameFileFallback')
     }
+    case 'delete_directory': {
+      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
+      return path
+        ? t('conversation.toolSummary.deleteDirectory', { path })
+        : t('conversation.toolSummary.deleteDirectoryFallback')
+    }
+    case 'rename_directory': {
+      const fromPath = getString(inputRecord ?? {}, 'fromPath') || getString(outputRecord ?? {}, 'fromPath')
+      const toPath = getString(inputRecord ?? {}, 'toPath') || getString(outputRecord ?? {}, 'toPath')
+      return fromPath && toPath
+        ? t('conversation.toolSummary.renameDirectory', { fromPath, toPath })
+        : t('conversation.toolSummary.renameDirectoryFallback')
+    }
     case 'inspect_project': {
       const files = Array.isArray(outputRecord?.files) ? outputRecord.files.length : undefined
       return files === undefined

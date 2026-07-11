@@ -85,6 +85,10 @@
       "deleteFileFallback": "删除文件",
       "renameFile": "重命名 {fromPath} -> {toPath}",
       "renameFileFallback": "重命名文件",
+      "deleteDirectory": "删除目录 {path}",
+      "deleteDirectoryFallback": "删除目录",
+      "renameDirectory": "重命名目录 {fromPath} -> {toPath}",
+      "renameDirectoryFallback": "重命名目录",
       "inspectProject": "检查项目",
       "inspectProjectWithCount": "检查项目，{count} 个文件"
     },

@@ -8,7 +8,7 @@ import type {
 } from '@/types/agent'
 
 const DB_NAME = 'hpTry'
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 export type StoreName =
   | 'projects'

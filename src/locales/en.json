@@ -85,6 +85,10 @@
       "deleteFileFallback": "Delete file",
       "renameFile": "Rename {fromPath} -> {toPath}",
       "renameFileFallback": "Rename file",
+      "deleteDirectory": "Delete directory {path}",
+      "deleteDirectoryFallback": "Delete directory",
+      "renameDirectory": "Rename directory {fromPath} -> {toPath}",
+      "renameDirectoryFallback": "Rename directory",
       "inspectProject": "Inspect project",
       "inspectProjectWithCount": "Inspect project, {count} files"
     },

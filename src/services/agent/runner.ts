@@ -33,6 +33,8 @@ export interface AgentRunHandlers {
   writeFile: (path: string, content: string) => Promise<WorkspaceFile>
   deleteFile: (path: string) => Promise<void>
   renameFile: (fromPath: string, toPath: string) => Promise<WorkspaceFile>
+  deleteDirectory: (path: string) => Promise<number>
+  renameDirectory: (fromPath: string, toPath: string) => Promise<WorkspaceFile[]>
 }
 
 function toChatMessages(systemPrompt: string, events: ConversationEvent[]): ChatMessageParam[] {
@@ -114,6 +116,8 @@ async function executeToolCall(
       writeFile: handlers.writeFile,
       deleteFile: handlers.deleteFile,
       renameFile: handlers.renameFile,
+      deleteDirectory: handlers.deleteDirectory,
+      renameDirectory: handlers.renameDirectory,
     })
 
     throwIfAborted(signal)

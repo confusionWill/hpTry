@@ -16,8 +16,10 @@ import {
 } from '@/services/db'
 import {
   deleteProjectWorkspaceFile,
+  deleteProjectWorkspaceDirectory,
   loadProjectWorkspaceFiles,
   renameProjectWorkspaceFile,
+  renameProjectWorkspaceDirectory,
   upsertProjectWorkspaceAsset,
   upsertProjectWorkspaceFile,
 } from '@/services/agent/workspaceFiles'
@@ -500,6 +502,33 @@ export const useAgentStore = defineStore('agent', {
 
       return file
     },
+    async deleteWorkspaceDirectory(projectId: string, files: WorkspaceFile[], path: string) {
+      const beforeCount = files.length
+      const nextFiles = await deleteProjectWorkspaceDirectory(projectId, files, path)
+      if (this.selectedProjectId === projectId) {
+        this.workspaceFiles = nextFiles
+        if (!nextFiles.some((file) => file.path === this.selectedWorkspaceFilePath)) {
+          this.selectedWorkspaceFilePath = nextFiles[0]?.path ?? ''
+        }
+      }
+      return beforeCount - nextFiles.length
+    },
+    async renameWorkspaceDirectory(
+      projectId: string,
+      files: WorkspaceFile[],
+      fromPath: string,
+      toPath: string,
+    ) {
+      const selectedPath = this.selectedWorkspaceFilePath
+      const movedFiles = await renameProjectWorkspaceDirectory(projectId, files, fromPath, toPath)
+      if (this.selectedProjectId === projectId) {
+        this.workspaceFiles = [...files]
+        if (selectedPath.startsWith(`${fromPath}/`)) {
+          this.selectedWorkspaceFilePath = `${toPath}${selectedPath.slice(fromPath.length)}`
+        }
+      }
+      return movedFiles
+    },
     async createToolRun(
       conversationId: string,
       events: ConversationEvent[],
@@ -663,6 +692,10 @@ export const useAgentStore = defineStore('agent', {
             deleteFile: (path) => this.deleteWorkspaceFile(runProject.id, runContext.files, path),
             renameFile: (fromPath, toPath) =>
               this.renameWorkspaceFile(runProject.id, runContext.files, fromPath, toPath),
+            deleteDirectory: (path) =>
+              this.deleteWorkspaceDirectory(runProject.id, runContext.files, path),
+            renameDirectory: (fromPath, toPath) =>
+              this.renameWorkspaceDirectory(runProject.id, runContext.files, fromPath, toPath),
           },
         })
 
