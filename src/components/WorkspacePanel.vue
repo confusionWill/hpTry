@@ -1,6 +1,20 @@
 <template>
   <aside class="workspace-panel" :class="{ 'workspace-panel--expanded': filesExpanded }">
     <section class="workspace-panel__files">
+      <div v-if="filesExpanded" class="workspace-panel__content">
+        <UiEmpty
+          v-if="store.workspaceFiles.length === 0"
+          :description="t('workspace.emptyFiles')"
+          :image-size="52"
+        />
+        <WorkspaceFileTree
+          v-else
+          :files="store.workspaceFiles"
+          :selected-path="store.selectedWorkspaceFilePath"
+          @select="previewWorkspaceFile"
+        />
+      </div>
+
       <button
         class="workspace-panel__section-title"
         type="button"
@@ -14,17 +28,6 @@
         </span>
         <span>{{ t('workspace.fileCount', { count: store.workspaceFiles.length }) }}</span>
       </button>
-      <UiEmpty
-        v-if="filesExpanded && store.workspaceFiles.length === 0"
-        :description="t('workspace.emptyFiles')"
-        :image-size="52"
-      />
-      <WorkspaceFileTree
-        v-else-if="filesExpanded"
-        :files="store.workspaceFiles"
-        :selected-path="store.selectedWorkspaceFilePath"
-        @select="previewWorkspaceFile"
-      />
     </section>
 
     <WorkspaceFilePreviewDialog
@@ -58,30 +61,58 @@ function previewWorkspaceFile(path: string) {
 
 <style scoped>
 .workspace-panel {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
   display: flex;
-  width: 100%;
+  width: 168px;
   min-width: 0;
-  height: auto;
+  height: 44px;
   flex-direction: column;
-  border-top: 1px solid var(--ui-border-color-light);
+  overflow: hidden;
+  border: 1px solid var(--ui-border-color-light);
+  border-radius: 999px;
   background: var(--ui-bg-color);
+  box-shadow: 0 8px 24px rgb(15 23 42 / 12%);
+  transform: translateX(-50%);
+  transition:
+    width 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    height 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-radius 280ms ease,
+    box-shadow 280ms ease;
+  z-index: 2;
 }
 
 .workspace-panel--expanded {
-  min-height: 220px;
-  max-height: 42vh;
+  width: calc(100% - 24px);
+  height: min(360px, 46vh);
+  border-radius: 18px;
+  box-shadow: 0 18px 44px rgb(15 23 42 / 18%);
 }
 
 .workspace-panel__files {
   display: flex;
   min-height: 0;
+  flex: 1;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
+  padding: 5px 8px;
 }
 
-.workspace-panel__files {
-  flex: 1 1 auto;
+.workspace-panel--expanded .workspace-panel__files {
+  padding: 10px;
+}
+
+.workspace-panel__content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 8px;
+}
+
+.workspace-panel__content :deep(.file-tree) {
+  flex: 1;
 }
 
 .workspace-panel__section-title {
@@ -94,11 +125,17 @@ function previewWorkspaceFile(path: string) {
   background: transparent;
   color: var(--ui-text-color-secondary);
   cursor: pointer;
+  flex: 0 0 32px;
   font: inherit;
   font-size: 12px;
   font-weight: 650;
-  padding: 0;
+  padding: 0 6px;
   text-align: left;
+}
+
+.workspace-panel--expanded .workspace-panel__section-title {
+  border-top: 1px solid var(--ui-border-color-light);
+  padding-top: 5px;
 }
 
 .workspace-panel__section-title span:last-child {
@@ -123,9 +160,14 @@ function previewWorkspaceFile(path: string) {
 }
 
 @media (max-width: 1180px) {
+  .workspace-panel--expanded {
+    width: calc(100% - 20px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   .workspace-panel {
-    width: 100%;
-    min-width: 0;
+    transition: none;
   }
 }
 </style>

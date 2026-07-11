@@ -1,7 +1,7 @@
 <template>
   <aside class="sidebar">
     <div class="section">
-      <div class="section__header">
+      <div class="section__header project-picker">
         <UiButton
           :aria-label="t('common.settings')"
           circle
@@ -12,6 +12,13 @@
             <Settings :size="17" />
           </template>
         </UiButton>
+        <UiSelect
+          v-model="selectedProjectId"
+          class="project-select"
+          :options="projectOptions"
+          :placeholder="t('project.selectPlaceholder')"
+          @change="handleProjectChange"
+        />
         <UiButton
           :aria-label="t('project.create')"
           circle
@@ -22,18 +29,6 @@
           </template>
         </UiButton>
       </div>
-
-      <UiSelect
-        v-model="selectedProjectId"
-        class="project-select"
-        :options="projectOptions"
-        :placeholder="t('project.selectPlaceholder')"
-        @change="handleProjectChange"
-      />
-
-      <p v-if="store.selectedProject?.description" class="project-description">
-        {{ store.selectedProject.description }}
-      </p>
     </div>
 
     <div class="section conversations">
@@ -144,12 +139,6 @@
         <UiFormItem :label="t('common.name')" required>
           <UiInput v-model="projectForm.name" :placeholder="t('project.namePlaceholder')" />
         </UiFormItem>
-        <UiFormItem :label="t('common.description')">
-          <UiTextarea
-            v-model="projectForm.description"
-            :placeholder="t('project.descriptionPlaceholder')"
-          />
-        </UiFormItem>
       </form>
       <template #footer>
         <UiButton @click="projectDialogVisible = false">
@@ -174,7 +163,6 @@ import UiEmpty from '@/components/ui/UiEmpty.vue'
 import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
-import UiTextarea from '@/components/ui/UiTextarea.vue'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 
@@ -191,7 +179,6 @@ const editingConversationId = ref('')
 const editingConversationTitle = ref('')
 const projectForm = reactive({
   name: '',
-  description: '',
 })
 
 const projectOptions = computed<UiSelectOption[]>(() =>
@@ -217,10 +204,9 @@ async function handleProjectChange(projectId: string) {
 async function createProject() {
   await store.createProject({
     name: projectForm.name,
-    description: projectForm.description,
+    description: '',
   })
   projectForm.name = ''
-  projectForm.description = ''
   projectDialogVisible.value = false
 }
 
@@ -262,12 +248,14 @@ async function confirmDeleteConversation(conversationId: string) {
 
 <style scoped>
 .sidebar {
+  position: relative;
   display: flex;
   width: 100%;
   min-width: 0;
   height: 100%;
   flex-direction: column;
   gap: 16px;
+  overflow: hidden;
   background: var(--ui-bg-color);
   padding: 16px;
 }
@@ -295,19 +283,60 @@ async function confirmDeleteConversation(conversationId: string) {
 }
 
 .project-select {
-  width: 100%;
+  min-width: 0;
+  flex: 1;
 }
 
-.project-description {
-  margin: 0;
-  color: var(--ui-text-color-secondary);
-  font-size: 13px;
-  line-height: 1.5;
+.project-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .conversations {
+  position: absolute;
+  top: 64px;
+  bottom: 76px;
+  left: 0;
+  width: calc(100% - 16px);
   min-height: 0;
-  flex: 1;
+  overflow: hidden;
+  border: 1px solid var(--ui-border-color-light);
+  border-left: 0;
+  border-radius: 0 16px 16px 0;
+  background: var(--ui-bg-color);
+  box-shadow: 10px 0 28px rgb(15 23 42 / 12%);
+  padding: 14px 18px 14px 14px;
+  transform: translateX(calc(-100% + 18px));
+  transition:
+    transform 300ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 300ms ease;
+  will-change: transform;
+  z-index: 1;
+}
+
+.conversations::after {
+  position: absolute;
+  top: 50%;
+  right: 5px;
+  width: 4px;
+  height: 44px;
+  border-radius: 999px;
+  background: var(--ui-border-color);
+  content: "";
+  transform: translateY(-50%);
+  transition: background-color 200ms ease;
+}
+
+.conversations:hover,
+.conversations:focus-within {
+  box-shadow: 14px 0 36px rgb(15 23 42 / 18%);
+  transform: translateX(0);
+}
+
+.conversations:hover::after,
+.conversations:focus-within::after {
+  background: var(--ui-color-primary-light-5);
 }
 
 .conversation-list {
@@ -365,5 +394,11 @@ async function confirmDeleteConversation(conversationId: string) {
 .conversation-item--active {
   border-color: var(--ui-color-primary-light-7);
   background: var(--ui-color-primary-light-9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .conversations {
+    transition: none;
+  }
 }
 </style>

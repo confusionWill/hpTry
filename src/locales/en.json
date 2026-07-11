@@ -11,7 +11,6 @@
     "save": "Save",
     "empty": "No data",
     "name": "Name",
-    "description": "Description",
     "actions": "Actions",
     "required": "Required",
     "loading": "Loading",
@@ -23,7 +22,6 @@
     "create": "Create project",
     "selectPlaceholder": "Select project",
     "namePlaceholder": "Project name",
-    "descriptionPlaceholder": "Project description",
     "running": "Running",
     "emptyTitle": "Create a project first",
     "emptyDescription": "Create a project before starting conversations."

@@ -11,7 +11,6 @@
     "save": "保存",
     "empty": "暂无数据",
     "name": "名称",
-    "description": "描述",
     "actions": "操作",
     "required": "必填",
     "loading": "加载中",
@@ -23,7 +22,6 @@
     "create": "创建项目",
     "selectPlaceholder": "选择项目",
     "namePlaceholder": "项目名称",
-    "descriptionPlaceholder": "项目描述",
     "running": "运行中",
     "emptyTitle": "先创建项目",
     "emptyDescription": "创建项目后才能开始会话。"

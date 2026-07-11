@@ -186,7 +186,7 @@ export const useAgentStore = defineStore('agent', {
         this.loading = false
       }
     },
-    async selectProject(projectId: string) {
+    async selectProject(projectId: string, startNewConversation = false) {
       const loadToken = this.projectLoadToken + 1
 
       this.projectLoadToken = loadToken
@@ -201,8 +201,8 @@ export const useAgentStore = defineStore('agent', {
       }
 
       this.conversations = conversations
-      this.selectedConversationId = this.conversations[0]?.id ?? ''
-      this.draftConversationProjectId = ''
+      this.selectedConversationId = startNewConversation ? '' : (this.conversations[0]?.id ?? '')
+      this.draftConversationProjectId = startNewConversation ? projectId : ''
       this.events = []
       this.conversationLoadToken += 1
       await this.loadWorkspaceFiles(projectId, loadToken)
@@ -250,7 +250,7 @@ export const useAgentStore = defineStore('agent', {
 
       await putRecord('projects', project)
       this.projects = sortUpdated([...this.projects, project])
-      await this.selectProject(project.id)
+      await this.selectProject(project.id, true)
     },
     async deleteProject(projectId: string) {
       if (this.isProjectRunning(projectId)) {

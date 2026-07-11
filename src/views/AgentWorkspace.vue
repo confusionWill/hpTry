@@ -84,12 +84,13 @@ watch(
 }
 
 .workspace__left {
+  position: relative;
   display: grid;
   min-width: 0;
   min-height: 0;
   border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
 }
 
 .workspace__preview {
