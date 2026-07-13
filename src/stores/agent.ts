@@ -24,6 +24,7 @@ import {
   upsertProjectWorkspaceAsset,
   upsertProjectWorkspaceFile,
 } from '@/services/agent/workspaceFiles'
+import { initializePresentationWorkspace } from '@/services/agent/presentationTemplate'
 import { exportWorkspaceAsZip } from '@/services/agent/workspaceExport'
 import type {
   ChatMessage,
@@ -253,6 +254,16 @@ export const useAgentStore = defineStore('agent', {
       }
 
       await putRecord('projects', project)
+
+      try {
+        await initializePresentationWorkspace(project.id, project.name)
+      } catch (error) {
+        await deleteRecordsByIndex('workspaceFiles', 'projectId', project.id)
+        await deleteRecordsByIndex('workspaceAssets', 'projectId', project.id)
+        await deleteRecord('projects', project.id)
+        throw error
+      }
+
       this.projects = sortUpdated([...this.projects, project])
       await this.selectProject(project.id, true)
     },

@@ -1,0 +1,116 @@
+import { computed, createApp, markRaw, onBeforeUnmount, onMounted, ref } from './vue.esm-browser.prod.js'
+
+const manifestUrl = new URL('../manifest.json', import.meta.url)
+const manifest = await fetch(manifestUrl).then((response) => {
+  if (!response.ok) {
+    throw new Error(`Unable to load manifest.json (${response.status})`)
+  }
+
+  return response.json()
+})
+
+if (!Array.isArray(manifest.slides) || manifest.slides.length === 0) {
+  throw new Error('manifest.json must contain at least one slide')
+}
+
+document.title = manifest.name || 'Presentation'
+
+const slideModules = await Promise.all(
+  manifest.slides.map(async (slidePath) => {
+    const slideModule = await import(new URL(slidePath, manifestUrl).href)
+
+    if (!slideModule.default) {
+      throw new Error(`Slide ${slidePath} does not have a default export`)
+    }
+
+    return markRaw(slideModule.default)
+  }),
+)
+
+const keyboardNavigation = {
+  enabled: manifest.navigation?.keyboard?.enabled !== false,
+  prev: Array.isArray(manifest.navigation?.keyboard?.prev)
+    ? manifest.navigation.keyboard.prev
+    : ['ArrowLeft'],
+  next: Array.isArray(manifest.navigation?.keyboard?.next)
+    ? manifest.navigation.keyboard.next
+    : ['ArrowRight'],
+}
+
+function readHashState() {
+  const params = new URLSearchParams(location.hash.slice(1))
+  const requestedPage = Number.parseInt(params.get('slide') || '1', 10)
+  const page = Number.isInteger(requestedPage)
+    ? Math.min(Math.max(requestedPage, 1), slideModules.length)
+    : 1
+
+  return {
+    page,
+    thumbnail: params.get('mode') === 'thumbnail',
+  }
+}
+
+function goToPage(page) {
+  const state = readHashState()
+  const nextPage = Math.min(Math.max(page, 1), slideModules.length)
+
+  if (nextPage === state.page) {
+    return
+  }
+
+  const params = new URLSearchParams(location.hash.slice(1))
+  params.set('slide', String(nextPage))
+  location.hash = params.toString()
+}
+
+const PresentationApp = {
+  setup() {
+    const state = ref(readHashState())
+    const currentSlide = computed(() => slideModules[state.value.page - 1])
+
+    function syncFromHash() {
+      state.value = readHashState()
+      document.documentElement.dataset.mode = state.value.thumbnail ? 'thumbnail' : 'preview'
+    }
+
+    function handleKeydown(event) {
+      if (state.value.thumbnail || !keyboardNavigation.enabled) {
+        return
+      }
+
+      if (keyboardNavigation.next.includes(event.key)) {
+        event.preventDefault()
+        goToPage(state.value.page + 1)
+      } else if (keyboardNavigation.prev.includes(event.key)) {
+        event.preventDefault()
+        goToPage(state.value.page - 1)
+      }
+    }
+
+    onMounted(() => {
+      syncFromHash()
+      window.addEventListener('hashchange', syncFromHash)
+      window.addEventListener('keydown', handleKeydown)
+    })
+
+    onBeforeUnmount(() => {
+      window.removeEventListener('hashchange', syncFromHash)
+      window.removeEventListener('keydown', handleKeydown)
+    })
+
+    return {
+      currentSlide,
+      manifest,
+      state,
+    }
+  },
+  template: `
+    <component
+      :is="currentSlide"
+      :manifest="manifest"
+      :page="state.page"
+    />
+  `,
+}
+
+createApp(PresentationApp).mount('#presentation')

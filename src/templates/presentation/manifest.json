@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "name": "Untitled Presentation",
+  "entry": "./hp.html",
+  "aspectRatio": "16:9",
+  "navigation": {
+    "keyboard": {
+      "enabled": true,
+      "prev": [
+        "ArrowLeft"
+      ],
+      "next": [
+        "ArrowRight"
+      ]
+    }
+  },
+  "slides": [
+    "./slides/slide-001.js"
+  ]
+}
