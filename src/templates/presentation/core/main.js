@@ -1,4 +1,4 @@
-import { computed, createApp, markRaw, onBeforeUnmount, onMounted, ref } from './vue.esm-browser.prod.js'
+import { computed, createApp, defineAsyncComponent, markRaw, onBeforeUnmount, onMounted, ref } from './vue.esm-browser.prod.js'
 
 const manifestUrl = new URL('../manifest.json', import.meta.url)
 const manifest = await fetch(manifestUrl).then((response) => {
@@ -15,16 +15,18 @@ if (!Array.isArray(manifest.slides) || manifest.slides.length === 0) {
 
 document.title = manifest.name || 'Presentation'
 
-const slideModules = await Promise.all(
-  manifest.slides.map(async (slidePath) => {
-    const slideModule = await import(new URL(slidePath, manifestUrl).href)
+const slideComponents = manifest.slides.map((slidePath) =>
+  markRaw(
+    defineAsyncComponent(async () => {
+      const slideModule = await import(new URL(slidePath, manifestUrl).href)
 
-    if (!slideModule.default) {
-      throw new Error(`Slide ${slidePath} does not have a default export`)
-    }
+      if (!slideModule.default) {
+        throw new Error(`Slide ${slidePath} does not have a default export`)
+      }
 
-    return markRaw(slideModule.default)
-  }),
+      return slideModule.default
+    }),
+  ),
 )
 
 const keyboardNavigation = {
@@ -41,7 +43,7 @@ function readHashState() {
   const params = new URLSearchParams(location.hash.slice(1))
   const requestedPage = Number.parseInt(params.get('slide') || '1', 10)
   const page = Number.isInteger(requestedPage)
-    ? Math.min(Math.max(requestedPage, 1), slideModules.length)
+    ? Math.min(Math.max(requestedPage, 1), slideComponents.length)
     : 1
 
   return {
@@ -52,7 +54,7 @@ function readHashState() {
 
 function goToPage(page) {
   const state = readHashState()
-  const nextPage = Math.min(Math.max(page, 1), slideModules.length)
+  const nextPage = Math.min(Math.max(page, 1), slideComponents.length)
 
   if (nextPage === state.page) {
     return
@@ -66,7 +68,7 @@ function goToPage(page) {
 const PresentationApp = {
   setup() {
     const state = ref(readHashState())
-    const currentSlide = computed(() => slideModules[state.value.page - 1])
+    const currentSlide = computed(() => slideComponents[state.value.page - 1])
 
     function syncFromHash() {
       state.value = readHashState()

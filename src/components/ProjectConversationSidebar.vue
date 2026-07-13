@@ -31,6 +31,15 @@
       </div>
     </div>
 
+    <PresentationSlideSidebar
+      v-if="presentationStore.manifest && presentationStore.previewUrl"
+      :active-page="presentationStore.activeSlidePage"
+      :aspect-ratio="presentationStore.manifest.aspectRatio"
+      :preview-url="presentationStore.previewUrl"
+      :slides="presentationStore.manifest.slides"
+      @select="presentationStore.selectSlide"
+    />
+
     <div class="section conversations">
       <div class="section__header">
         <h2>{{ t('conversation.title') }}</h2>
@@ -163,7 +172,9 @@ import UiEmpty from '@/components/ui/UiEmpty.vue'
 import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import PresentationSlideSidebar from '@/components/PresentationSlideSidebar.vue'
 import { useAgentStore } from '@/stores/agent'
+import { usePresentationStore } from '@/stores/presentation'
 import { useUiStore } from '@/stores/ui'
 
 defineEmits<{
@@ -171,6 +182,7 @@ defineEmits<{
 }>()
 
 const store = useAgentStore()
+const presentationStore = usePresentationStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
 

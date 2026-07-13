@@ -127,6 +127,9 @@
       "aspectRatioNone": "None",
       "enterFullscreen": "Preview fullscreen",
       "exitFullscreen": "Exit fullscreen",
+      "slideList": "Slide previews",
+      "openSlide": "Open slide {page}",
+      "slideThumbnail": "Slide {page} thumbnail",
       "missingIndex": "The workspace needs hp.html to preview",
       "unavailable": "This browser does not support the live preview service"
     },

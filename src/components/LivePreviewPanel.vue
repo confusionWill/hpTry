@@ -38,21 +38,23 @@
         :description="t('workspace.livePreview.unavailable')"
         :image-size="72"
       />
-      <div
-        v-else
-        class="live-preview__viewport"
-        :class="{ 'live-preview__viewport--fixed': selectedAspectRatioValue !== null }"
-        :style="previewViewportStyle"
-      >
-        <iframe
-          ref="previewFrameRef"
-          :key="previewUrl"
-          allowfullscreen
-          class="live-preview__frame"
-          :src="previewUrl"
-          tabindex="-1"
-          :title="t('workspace.livePreview.title')"
-        />
+      <div v-else class="live-preview__stage">
+        <div
+          class="live-preview__viewport"
+          :class="{ 'live-preview__viewport--fixed': selectedAspectRatioValue !== null }"
+          :style="previewViewportStyle"
+        >
+          <iframe
+            ref="previewFrameRef"
+            :key="presentationStore.previewUrl"
+            allowfullscreen
+            class="live-preview__frame"
+            :src="presentationStore.mainPreviewUrl"
+            tabindex="-1"
+            :title="t('workspace.livePreview.title')"
+            @load="handlePreviewFrameLoad"
+          />
+        </div>
       </div>
     </div>
   </section>
@@ -67,15 +69,14 @@ import PreviewAspectRatioSelect from '@/components/PreviewAspectRatioSelect.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import WorkspaceExportButton from '@/components/WorkspaceExportButton.vue'
-import { useAgentStore } from '@/stores/agent'
-import type { WorkspaceFile } from '@/types/agent'
+import { usePresentationStore } from '@/stores/presentation'
 
-const store = useAgentStore()
+const presentationStore = usePresentationStore()
 const { t } = useI18n()
 const previewWorkerReady = ref(false)
-const committedPreviewVersion = ref('0')
 const previewFrameRef = ref<HTMLIFrameElement | null>(null)
 const isPreviewFullscreen = ref(false)
+let observedPreviewWindow: Window | null = null
 
 const selectedAspectRatio = ref('none')
 
@@ -91,7 +92,7 @@ const aspectRatioMap: Record<string, number | null> = {
 const selectedAspectRatioValue = computed(() => aspectRatioMap[selectedAspectRatio.value] ?? null)
 const canUseFullscreen = computed(
   () =>
-    Boolean(indexFile.value) &&
+    Boolean(presentationStore.indexFile) &&
     previewWorkerReady.value &&
     document.fullscreenEnabled &&
     Boolean(previewFrameRef.value?.requestFullscreen),
@@ -107,44 +108,10 @@ const previewViewportStyle = computed<Partial<Record<string, string>>>(() => {
   }
 })
 
-const fileMap = computed(() => {
-  const files = new Map<string, WorkspaceFile>()
-
-  for (const file of store.workspaceFiles) {
-    files.set(normalizePath(file.path), file)
-  }
-
-  return files
-})
-
-const indexFile = computed(() => {
-  const rootIndex = fileMap.value.get('hp.html')
-
-  if (rootIndex) {
-    return rootIndex
-  }
-
-  return store.workspaceFiles.find((file) => normalizePath(file.path).endsWith('/hp.html'))
-})
-
-const previewPathLabel = computed(() => indexFile.value?.path ?? t('workspace.livePreview.noEntry'))
-
-const latestWorkspaceVersion = computed(() =>
-  store.workspaceFiles
-    .map((file) => file.updatedAt)
-    .reduce((latest, updatedAt) => Math.max(latest, updatedAt), 0)
-    .toString(),
+const indexFile = computed(() => presentationStore.indexFile)
+const previewPathLabel = computed(
+  () => presentationStore.indexFile?.path ?? t('workspace.livePreview.noEntry'),
 )
-
-const previewUrl = computed(() => {
-  if (!store.selectedProjectId || !indexFile.value) {
-    return ''
-  }
-
-  return `/preview/${encodeURIComponent(store.selectedProjectId)}/${encodePreviewPath(
-    indexFile.value.path,
-  )}?v=${encodeURIComponent(committedPreviewVersion.value)}`
-})
 
 onMounted(async () => {
   previewWorkerReady.value = await registerPreviewWorker()
@@ -152,44 +119,60 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  detachPreviewHashListener()
   document.removeEventListener('fullscreenchange', syncFullscreenState)
 })
 
 watch(
-  [latestWorkspaceVersion, () => store.isSelectedProjectRunning, () => store.selectedProjectId],
-  ([latestVersion, isRunning], [, wasRunning]) => {
-    if (isRunning) {
-      return
-    }
-
-    if (wasRunning || committedPreviewVersion.value !== latestVersion) {
-      committedPreviewVersion.value = latestVersion
-    }
+  () => presentationStore.activeSlidePage,
+  (page) => {
+    navigatePreviewFrameToSlide(page)
+    focusPreviewFrame()
   },
-  { immediate: true },
 )
+function navigatePreviewFrameToSlide(page: number) {
+  const frameWindow = previewFrameRef.value?.contentWindow
 
-function encodePreviewPath(path: string): string {
-  return normalizePath(path).split('/').map(encodeURIComponent).join('/')
+  if (frameWindow) {
+    try {
+      const params = new URLSearchParams(frameWindow.location.hash.slice(1))
+      params.set('slide', String(page))
+      params.delete('mode')
+      frameWindow.location.hash = params.toString()
+    } catch {
+      // The reactive iframe src remains the fallback if the frame is not ready yet.
+    }
+  }
 }
 
-function normalizePath(path: string): string {
-  const parts: string[] = []
+function handlePreviewFrameLoad() {
+  detachPreviewHashListener()
+  observedPreviewWindow = previewFrameRef.value?.contentWindow ?? null
+  observedPreviewWindow?.addEventListener('hashchange', syncActiveSlideFromFrame)
+  syncActiveSlideFromFrame()
+}
 
-  for (const part of path.replace(/^\.?\//, '').split('/')) {
-    if (!part || part === '.') {
-      continue
-    }
+function detachPreviewHashListener() {
+  observedPreviewWindow?.removeEventListener('hashchange', syncActiveSlideFromFrame)
+  observedPreviewWindow = null
+}
 
-    if (part === '..') {
-      parts.pop()
-      continue
-    }
-
-    parts.push(part)
+function syncActiveSlideFromFrame() {
+  if (!observedPreviewWindow) {
+    return
   }
 
-  return parts.join('/')
+  try {
+    const params = new URLSearchParams(observedPreviewWindow.location.hash.slice(1))
+    const page = Number.parseInt(params.get('slide') ?? '', 10)
+    const slideCount = presentationStore.manifest?.slides.length ?? 0
+
+    if (Number.isInteger(page) && page >= 1 && page <= slideCount) {
+      presentationStore.selectSlide(page)
+    }
+  } catch {
+    // Ignore an inaccessible frame while its document is being replaced.
+  }
 }
 
 async function togglePreviewFullscreen() {
@@ -306,6 +289,17 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   min-height: 0;
   flex: 1;
   background: var(--ui-fill-color-light);
+  container-type: size;
+  place-items: center;
+}
+
+.live-preview__stage {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
   container-type: size;
   place-items: center;
 }
