@@ -648,6 +648,7 @@ export const useAgentStore = defineStore('agent', {
       ]
       const abortController = new AbortController()
       activeRunControllers.set(runConversation.id, abortController)
+      let streamingAssistantMessage: ChatMessage | undefined
 
       try {
         const runContext: AgentRunContext = {
@@ -714,17 +715,46 @@ export const useAgentStore = defineStore('agent', {
             renameDirectory: (fromPath, toPath) =>
               this.renameWorkspaceDirectory(runProject.id, runContext.files, fromPath, toPath),
           },
+          onAssistantStream: (streamedContent) => {
+            const timestamp = now()
+
+            streamingAssistantMessage = {
+              id: streamingAssistantMessage?.id ?? createId('message'),
+              conversationId: runConversation.id,
+              type: 'message',
+              role: 'assistant',
+              content: streamedContent,
+              createdAt: streamingAssistantMessage?.createdAt ?? timestamp,
+              updatedAt: timestamp,
+            }
+
+            if (this.selectedConversationId === runConversation.id) {
+              this.events = sortCreated([
+                ...this.events.filter((event) => event.id !== streamingAssistantMessage?.id),
+                streamingAssistantMessage,
+              ])
+            }
+          },
+          onAssistantStreamReset: () => {
+            if (streamingAssistantMessage && this.selectedConversationId === runConversation.id) {
+              this.events = this.events.filter(
+                (event) => event.id !== streamingAssistantMessage?.id,
+              )
+            }
+
+            streamingAssistantMessage = undefined
+          },
         })
 
         throwIfAborted(abortController.signal)
         const responseEndedAt = now()
         const assistantMessage: ChatMessage = {
-          id: createId('message'),
+          id: streamingAssistantMessage?.id ?? createId('message'),
           conversationId: runConversation.id,
           type: 'message',
           role: 'assistant',
           content: finalContent || emptyFinalMessage,
-          createdAt: responseEndedAt,
+          createdAt: streamingAssistantMessage?.createdAt ?? responseEndedAt,
           updatedAt: responseEndedAt,
           responseDurationMs: responseEndedAt - userMessage.createdAt,
         }
@@ -732,10 +762,19 @@ export const useAgentStore = defineStore('agent', {
         await putRecord('conversationEvents', assistantMessage)
 
         if (this.selectedConversationId === runConversation.id) {
-          this.events = [...this.events, assistantMessage]
+          this.events = sortCreated([
+            ...this.events.filter((event) => event.id !== assistantMessage.id),
+            assistantMessage,
+          ])
         }
 
+        streamingAssistantMessage = undefined
+
       } finally {
+        if (streamingAssistantMessage && this.selectedConversationId === runConversation.id) {
+          this.events = this.events.filter((event) => event.id !== streamingAssistantMessage?.id)
+        }
+
         const conversation =
           this.conversations.find((item) => item.id === runConversation.id) ??
           (await getRecord('conversations', runConversation.id))

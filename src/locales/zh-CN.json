@@ -106,6 +106,13 @@
     "deleteConfirm": "确认删除该供应商？",
     "requestTimeout": "请求超时，请稍后重试或检查供应商配置。",
     "requestFailed": "请求失败，请检查供应商配置。",
+    "responseError": {
+      "emptyResponse": "供应商返回了空响应。",
+      "invalidStreamResponse": "供应商返回了无效的流式响应。",
+      "invalidStreamingToolCall": "供应商返回了无效的工具调用。",
+      "streamEndedUnexpectedly": "流式响应意外中断，请重试。",
+      "streamFailed": "流式响应失败，请重试。"
+    },
     "missing": "请先选择供应商。"
   },
   "agent": {

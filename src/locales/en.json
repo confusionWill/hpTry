@@ -106,6 +106,13 @@
     "deleteConfirm": "Delete this provider?",
     "requestTimeout": "Request timed out. Try again later or check provider settings.",
     "requestFailed": "Request failed. Check provider settings.",
+    "responseError": {
+      "emptyResponse": "The provider returned an empty response.",
+      "invalidStreamResponse": "The provider returned an invalid streaming response.",
+      "invalidStreamingToolCall": "The provider returned an invalid tool call.",
+      "streamEndedUnexpectedly": "The streaming response ended unexpectedly. Try again.",
+      "streamFailed": "The streaming response failed. Try again."
+    },
     "missing": "Select a provider first."
   },
   "agent": {

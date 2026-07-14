@@ -85,7 +85,11 @@ import { useI18n } from 'vue-i18n'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiTextarea from '@/components/ui/UiTextarea.vue'
 import { AGENT_SYSTEM_PROMPT, CONVERSATION_TITLE_PROMPT } from '@/services/agent/prompts'
-import { ChatCompletionRequestError } from '@/services/openai'
+import {
+  CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS,
+  ChatCompletionRequestError,
+  ChatCompletionResponseError,
+} from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 
@@ -420,6 +424,11 @@ async function send() {
         error.code === 'timeout' ? t('provider.requestTimeout') : t('conversation.stopped'),
         error.code === 'timeout' ? 'error' : 'info',
       )
+      return
+    }
+
+    if (error instanceof ChatCompletionResponseError) {
+      uiStore.showToast(t(CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS[error.code]), 'error')
       return
     }
 

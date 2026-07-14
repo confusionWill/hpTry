@@ -164,6 +164,8 @@ export async function runAgentConversation(params: {
   runContext: AgentRunContext
   handlers: AgentRunHandlers
   signal?: AbortSignal
+  onAssistantStream?: (content: string) => void
+  onAssistantStreamReset?: () => void
 }): Promise<string> {
   const agentMessages = toChatMessages(params.systemPrompt, params.events)
 
@@ -175,6 +177,7 @@ export async function runAgentConversation(params: {
       tools: hpTryTools,
       toolChoice: 'auto',
       signal: params.signal,
+      onTextDelta: (_delta, content) => params.onAssistantStream?.(content),
     })
     throwIfAborted(params.signal)
     const toolCalls = response.message.tool_calls ?? []
@@ -182,6 +185,8 @@ export async function runAgentConversation(params: {
     if (toolCalls.length === 0) {
       return response.message.content?.trim() ?? ''
     }
+
+    params.onAssistantStreamReset?.()
 
     agentMessages.push({
       role: 'assistant',

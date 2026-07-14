@@ -101,7 +101,12 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
-import { ChatCompletionRequestError, requestChatCompletion } from '@/services/openai'
+import {
+  CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS,
+  ChatCompletionRequestError,
+  ChatCompletionResponseError,
+  requestChatCompletion,
+} from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 import type { Provider } from '@/types/agent'
@@ -210,6 +215,11 @@ async function testProvider() {
   } catch (error) {
     if (error instanceof ChatCompletionRequestError && error.code === 'timeout') {
       uiStore.showToast(t('provider.requestTimeout'), 'error')
+      return
+    }
+
+    if (error instanceof ChatCompletionResponseError) {
+      uiStore.showToast(t(CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS[error.code]), 'error')
       return
     }
 
