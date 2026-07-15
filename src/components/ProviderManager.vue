@@ -46,7 +46,6 @@
 
   <UiDialog
     v-model="formVisible"
-    :close-label="t('common.close')"
     :title="formTitle"
     width="520px"
     @closed="resetForm"

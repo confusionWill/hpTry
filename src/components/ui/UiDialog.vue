@@ -19,15 +19,6 @@
             <slot name="header">
               <h2>{{ title }}</h2>
             </slot>
-            <button
-              v-if="showClose"
-              class="ui-dialog__close"
-              :aria-label="closeLabel"
-              type="button"
-              @click="close"
-            >
-              <X :size="18" />
-            </button>
           </header>
           <div class="ui-dialog__body">
             <slot />
@@ -48,7 +39,6 @@ let nextDialogZIndex = dialogZIndexBase
 </script>
 
 <script setup lang="ts">
-import { X } from '@lucide/vue'
 import { ref, watch } from 'vue'
 
 const model = defineModel<boolean>({ required: true })
@@ -58,17 +48,13 @@ withDefaults(
     title?: string
     ariaLabel?: string
     width?: string
-    closeLabel?: string
     showHeader?: boolean
-    showClose?: boolean
   }>(),
   {
     title: '',
     ariaLabel: '',
     width: '420px',
-    closeLabel: 'Close',
     showHeader: false,
-    showClose: false,
   },
 )
 
@@ -145,23 +131,6 @@ watch(
   color: var(--ui-text-color-primary);
   font-size: 16px;
   font-weight: 650;
-}
-
-.ui-dialog__close {
-  display: grid;
-  width: 30px;
-  height: 30px;
-  place-items: center;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--ui-text-color-secondary);
-  cursor: pointer;
-}
-
-.ui-dialog__close:hover {
-  background: var(--ui-fill-color-light);
-  color: var(--ui-text-color-primary);
 }
 
 .ui-dialog__body {

@@ -82,40 +82,24 @@
                       <span>{{ summarizeToolGroup(bubble.tools) }}</span>
                     </summary>
                     <div class="message__tools-list">
-                      <article
+                      <button
                         v-for="tool in bubble.tools"
                         :key="tool.id"
                         class="tool-event"
                         :class="`tool-event--${tool.status}`"
+                        type="button"
+                        @click="openToolDetail(tool)"
                       >
-                        <details class="tool-event__details" :open="tool.status === 'running'">
-                          <summary>
-                            <span class="tool-event__name">
-                              {{ t('conversation.toolCall', { name: tool.toolName }) }}
-                            </span>
-                            <span class="tool-event__summary">
-                              {{ summarizeToolEvent(tool) }}
-                            </span>
-                            <span class="tool-event__status">
-                              {{ t(`workspace.toolStatus.${tool.status}`) }}
-                            </span>
-                          </summary>
-                          <div class="tool-event__body">
-                            <section>
-                              <h3>{{ t('conversation.toolInput') }}</h3>
-                              <pre>{{ formatToolPayload(tool.input) }}</pre>
-                            </section>
-                            <section v-if="tool.error">
-                              <h3>{{ t('conversation.toolError') }}</h3>
-                              <pre>{{ tool.error }}</pre>
-                            </section>
-                            <section v-else-if="tool.output">
-                              <h3>{{ t('conversation.toolOutput') }}</h3>
-                              <pre>{{ formatToolPayload(tool.output) }}</pre>
-                            </section>
-                          </div>
-                        </details>
-                      </article>
+                        <span class="tool-event__name">
+                          {{ t('conversation.toolCall', { name: tool.toolName }) }}
+                        </span>
+                        <span class="tool-event__summary">
+                          {{ summarizeToolEvent(tool) }}
+                        </span>
+                        <span class="tool-event__status">
+                          {{ t(`workspace.toolStatus.${tool.status}`) }}
+                        </span>
+                      </button>
                     </div>
                   </details>
 
@@ -142,6 +126,12 @@
         </div>
       </div>
     </template>
+
+    <ToolCallDetailDialog
+      v-model="toolDetailVisible"
+      :tool="selectedTool"
+      @closed="selectedToolId = ''"
+    />
   </section>
 </template>
 
@@ -153,6 +143,7 @@ import { useI18n } from 'vue-i18n'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
+import ToolCallDetailDialog from '@/components/ToolCallDetailDialog.vue'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationMessageEvent, ConversationToolEvent } from '@/types/agent'
 
@@ -183,6 +174,8 @@ const isTransitioning = ref(false)
 const messagesRef = ref<HTMLElement | null>(null)
 const shouldStickToBottom = ref(true)
 const lastMessagesScrollTop = ref(0)
+const selectedToolId = ref('')
+const toolDetailVisible = ref(false)
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const conversationBubbles = computed<ConversationBubble[]>(() => {
@@ -242,6 +235,16 @@ const conversationTitle = computed(() => {
   return t('conversation.selectEmpty')
 })
 const latestEvent = computed(() => store.events.at(-1))
+const selectedTool = computed(() => {
+  const event = store.events.find((item) => item.id === selectedToolId.value)
+
+  return event?.type === 'tool' ? event : undefined
+})
+
+function openToolDetail(tool: ConversationToolEvent) {
+  selectedToolId.value = tool.id
+  toolDetailVisible.value = true
+}
 
 function handleMessagesScroll() {
   const messages = messagesRef.value
@@ -400,18 +403,6 @@ function formatAnswerDuration(durationMs: number): string {
   }
 
   return `${(durationMs / 1000).toFixed(1)}s`
-}
-
-function formatToolPayload(payload: string): string {
-  if (!payload) {
-    return ''
-  }
-
-  try {
-    return JSON.stringify(JSON.parse(payload), null, 2)
-  } catch {
-    return payload
-  }
 }
 
 function parseToolPayload(payload: string): unknown {
@@ -788,10 +779,27 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 }
 
 .tool-event {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 12px;
   border: 1px solid var(--ui-border-color-light);
   border-radius: 8px;
   background: var(--ui-fill-color-blank);
   color: var(--ui-text-color-secondary);
+  cursor: pointer;
+  font: inherit;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.tool-event:hover {
+  background: var(--ui-fill-color-light);
+}
+
+.tool-event:focus-visible {
+  outline: 2px solid var(--ui-color-primary);
+  outline-offset: 2px;
 }
 
 .tool-event--success {
@@ -800,22 +808,6 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 
 .tool-event--error {
   border-color: #fecaca;
-}
-
-.tool-event__details {
-  padding: 10px 12px;
-}
-
-.tool-event__details summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.tool-event__details summary::-webkit-details-marker {
-  display: none;
 }
 
 .tool-event__name {
@@ -835,34 +827,6 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 .tool-event__status {
   flex: 0 0 auto;
   font-size: 12px;
-}
-
-.tool-event__body {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.tool-event__body h3 {
-  margin: 0 0 6px;
-  color: var(--ui-text-color-secondary);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.tool-event__body pre {
-  overflow: auto;
-  max-height: 280px;
-  margin: 0;
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-  background: var(--ui-fill-color-blank);
-  padding: 10px 12px;
-  color: var(--ui-text-color-primary);
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  white-space: pre;
 }
 
 </style>

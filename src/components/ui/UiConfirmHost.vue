@@ -3,7 +3,6 @@
     v-model="visible"
     :title="store.confirm?.title ?? ''"
     width="400px"
-    :close-label="t('common.close')"
     @closed="handleClosed"
   >
     <p class="ui-confirm__message">
@@ -26,7 +25,6 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useI18n } from 'vue-i18n'
 
 import { useUiStore } from '@/stores/ui'
 
@@ -34,7 +32,6 @@ import UiButton from './UiButton.vue'
 import UiDialog from './UiDialog.vue'
 
 const store = useUiStore()
-const { t } = useI18n()
 
 const visible = computed({
   get: () => Boolean(store.confirm),

@@ -140,7 +140,6 @@
 
     <UiDialog
       v-model="projectDialogVisible"
-      :close-label="t('common.close')"
       :title="t('project.create')"
       width="420px"
     >

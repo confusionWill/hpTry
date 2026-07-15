@@ -61,6 +61,9 @@
     "toolInput": "输入",
     "toolOutput": "输出",
     "toolError": "错误",
+    "toolDetail": {
+      "ariaLabel": "工具调用详情"
+    },
     "toolSummary": {
       "generic": "执行工具",
       "listFiles": "列出文件",

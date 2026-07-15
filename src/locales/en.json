@@ -61,6 +61,9 @@
     "toolInput": "Input",
     "toolOutput": "Output",
     "toolError": "Error",
+    "toolDetail": {
+      "ariaLabel": "Tool call details"
+    },
     "toolSummary": {
       "generic": "Run tool",
       "listFiles": "List files",

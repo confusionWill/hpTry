@@ -2,8 +2,6 @@
   <UiDialog
     v-model="model"
     :aria-label="t('workspace.previewDialog.ariaLabel')"
-    :close-label="t('common.close')"
-    :show-close="true"
     :show-header="true"
     :title="file?.path ?? t('workspace.preview')"
     width="min(920px, 92vw)"
