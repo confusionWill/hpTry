@@ -46,7 +46,6 @@
             ref="messagesRef"
             class="messages"
             @scroll="handleMessagesScroll"
-            @wheel.passive="handleMessagesWheel"
           >
             <template v-for="bubble in conversationBubbles" :key="bubble.id">
               <div
@@ -167,7 +166,7 @@ type ConversationBubble =
       message?: ConversationMessageEvent
     }
 
-defineProps<{
+const props = defineProps<{
   collapsed: boolean
 }>()
 
@@ -251,12 +250,6 @@ function handleMessagesScroll() {
   lastMessagesScrollTop.value = messages.scrollTop
 }
 
-function handleMessagesWheel(event: WheelEvent) {
-  if (event.deltaY < 0) {
-    shouldStickToBottom.value = false
-  }
-}
-
 async function scrollMessagesToBottom(force = false) {
   await nextTick()
 
@@ -289,6 +282,16 @@ watch(
   () => {
     shouldStickToBottom.value = true
     void scrollMessagesToBottom(true)
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => props.collapsed,
+  (collapsed) => {
+    if (!collapsed) {
+      void scrollMessagesToBottom()
+    }
   },
   { flush: 'post' },
 )
