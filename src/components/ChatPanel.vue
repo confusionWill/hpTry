@@ -234,7 +234,7 @@ const latestEvent = computed(() => store.events.at(-1))
 function handleMessagesScroll() {
   const messages = messagesRef.value
 
-  if (!messages) {
+  if (!messages || props.collapsed) {
     return
   }
 
@@ -286,16 +286,6 @@ watch(
   { flush: 'post' },
 )
 
-watch(
-  () => props.collapsed,
-  (collapsed) => {
-    if (!collapsed) {
-      void scrollMessagesToBottom()
-    }
-  },
-  { flush: 'post' },
-)
-
 onMounted(() => {
   void scrollMessagesToBottom(true)
 })
@@ -327,6 +317,11 @@ async function toggleCollapsed() {
   const updateCollapsedState = async () => {
     emit('toggleCollapsed')
     await nextTick()
+
+    if (!props.collapsed) {
+      shouldStickToBottom.value = true
+      await scrollMessagesToBottom(true)
+    }
   }
 
   if (!document.startViewTransition) {
@@ -343,6 +338,11 @@ async function toggleCollapsed() {
   } finally {
     document.documentElement.classList.remove('hero-view-transition')
     isTransitioning.value = false
+
+    if (!props.collapsed) {
+      shouldStickToBottom.value = true
+      await scrollMessagesToBottom(true)
+    }
   }
 }
 
