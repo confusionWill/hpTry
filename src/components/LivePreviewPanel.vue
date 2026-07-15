@@ -127,7 +127,6 @@ watch(
   () => presentationStore.activeSlidePage,
   (page) => {
     navigatePreviewFrameToSlide(page)
-    focusPreviewFrame()
   },
 )
 function navigatePreviewFrameToSlide(page: number) {

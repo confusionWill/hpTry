@@ -21,6 +21,30 @@
   --ui-text-color-primary: #0f172a;
   --ui-text-color-secondary: #64748b;
   --ui-text-color-placeholder: #94a3b8;
+  --ui-scrollbar-thumb: #eeeeee;
+  --ui-scrollbar-thumb-hover: #e0e0e0;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 0;
+  background: var(--ui-scrollbar-thumb);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-scrollbar-thumb-hover);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 html,

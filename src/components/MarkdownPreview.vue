@@ -4,67 +4,19 @@
 </template>
 
 <script setup lang="ts">
-import DOMPurify from 'dompurify'
-import hljs from 'highlight.js/lib/common'
 import 'highlight.js/styles/github.css'
-import MarkdownIt from 'markdown-it'
 import { computed } from 'vue'
+
+import { renderMarkdown } from '@/utils/markdown'
 
 interface Props {
   content: string
+  streaming?: boolean
 }
 
 const props = defineProps<Props>()
 
-const markdown = new MarkdownIt({
-  breaks: true,
-  html: false,
-  linkify: false,
-  typographer: true,
-  highlight(code: string, language: string): string {
-    const normalizedLanguage = language.trim()
-
-    if (normalizedLanguage && hljs.getLanguage(normalizedLanguage)) {
-      try {
-        return hljs.highlight(code, { language: normalizedLanguage }).value
-      } catch {
-        return markdown.utils.escapeHtml(code)
-      }
-    }
-
-    return markdown.utils.escapeHtml(code)
-  },
-})
-
-const defaultLinkOpen =
-  markdown.renderer.rules.link_open ??
-  ((tokens, index, options, _env, self) => self.renderToken(tokens, index, options))
-
-markdown.renderer.rules.link_open = (tokens, index, options, env, self) => {
-  const token = tokens[index]
-  const targetIndex = token.attrIndex('target')
-  const relIndex = token.attrIndex('rel')
-
-  if (targetIndex < 0) {
-    token.attrPush(['target', '_blank'])
-  } else {
-    token.attrs![targetIndex][1] = '_blank'
-  }
-
-  if (relIndex < 0) {
-    token.attrPush(['rel', 'noopener noreferrer'])
-  } else {
-    token.attrs![relIndex][1] = 'noopener noreferrer'
-  }
-
-  return defaultLinkOpen(tokens, index, options, env, self)
-}
-
-const renderedHtml = computed(() =>
-  DOMPurify.sanitize(markdown.render(props.content), {
-    ADD_ATTR: ['target'],
-  }),
-)
+const renderedHtml = computed(() => renderMarkdown(props.content, !props.streaming))
 </script>
 
 <style scoped>

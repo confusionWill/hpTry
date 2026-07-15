@@ -28,21 +28,26 @@
       <UiEmpty :description="t('conversation.selectEmpty')" />
     </div>
 
-    <div v-else-if="collapsed && canChat" class="chat-panel__avatar-list">
-      <span
-        v-for="bubble in conversationBubbles"
-        :key="bubble.id"
-        class="message-avatar"
-        :class="`message-avatar--${bubble.type}`"
-        :style="avatarTransitionStyle(bubble.id)"
-        aria-hidden="true"
-      />
-    </div>
+    <template v-else-if="canChat">
+      <div v-show="collapsed" class="chat-panel__avatar-list">
+        <span
+          v-for="bubble in collapsedConversationBubbles"
+          :key="bubble.id"
+          class="message-avatar"
+          :class="`message-avatar--${bubble.type}`"
+          :style="avatarTransitionStyle(bubble.id)"
+          aria-hidden="true"
+        />
+      </div>
 
-    <template v-else-if="!collapsed">
-      <div class="chat-panel__body">
+      <div v-show="!collapsed" class="chat-panel__body">
         <div class="chat-panel__conversation">
-          <div class="messages">
+          <div
+            ref="messagesRef"
+            class="messages"
+            @scroll="handleMessagesScroll"
+            @wheel.passive="handleMessagesWheel"
+          >
             <template v-for="bubble in conversationBubbles" :key="bubble.id">
               <div
                 v-if="bubble.type === 'user'"
@@ -65,25 +70,6 @@
                   aria-hidden="true"
                 />
                 <article class="message message--assistant">
-                  <div v-if="bubble.message" class="message__actions">
-                    <UiButton
-                      circle
-                      text
-                      class="message__toggle"
-                      :aria-label="
-                        isSourceVisible(bubble.message.id)
-                          ? t('conversation.previewMarkdown')
-                          : t('conversation.viewMarkdownSource')
-                      "
-                      @click="toggleSource(bubble.message.id)"
-                    >
-                      <template #icon>
-                        <Eye v-if="isSourceVisible(bubble.message.id)" :size="15" />
-                        <Code2 v-else :size="15" />
-                      </template>
-                    </UiButton>
-                  </div>
-
                   <details
                     v-if="bubble.tools.length > 0"
                     class="message__tools"
@@ -132,11 +118,10 @@
                   </details>
 
                   <template v-if="bubble.message">
-                    <pre
-                      v-if="isSourceVisible(bubble.message.id)"
-                      class="message__source"
-                    >{{ bubble.message.content }}</pre>
-                    <MarkdownPreview v-else :content="bubble.message.content" />
+                    <MarkdownPreview
+                      :content="bubble.message.content"
+                      :streaming="isStreamingAssistantMessage(bubble.message)"
+                    />
                     <span
                       v-if="bubble.message.responseDurationMs !== undefined"
                       class="message__answer-duration"
@@ -159,8 +144,8 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight, Code2, Eye } from '@lucide/vue'
-import { computed, nextTick, ref } from 'vue'
+import { ChevronLeft, ChevronRight } from '@lucide/vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
@@ -192,15 +177,17 @@ const emit = defineEmits<{
 
 const store = useAgentStore()
 const { t } = useI18n()
-const sourceMessageIds = ref<Set<string>>(new Set())
 const isTransitioning = ref(false)
+const messagesRef = ref<HTMLElement | null>(null)
+const shouldStickToBottom = ref(true)
+const lastMessagesScrollTop = ref(0)
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const conversationBubbles = computed<ConversationBubble[]>(() => {
   const bubbles: ConversationBubble[] = []
   let currentAssistantBubble: Extract<ConversationBubble, { type: 'assistant' }> | undefined
 
-  for (const event of [...store.events].sort((left, right) => left.createdAt - right.createdAt)) {
+  for (const event of store.events) {
     if (event.type === 'message' && event.role === 'user') {
       bubbles.push({
         id: event.id,
@@ -231,6 +218,7 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
 
   return bubbles
 })
+const collapsedConversationBubbles = computed(() => conversationBubbles.value.slice(-8))
 const conversationTitle = computed(() => {
   if (store.selectedConversation) {
     return store.selectedConversation.title
@@ -242,8 +230,87 @@ const conversationTitle = computed(() => {
 
   return t('conversation.selectEmpty')
 })
+const latestEvent = computed(() => store.events.at(-1))
+
+function handleMessagesScroll() {
+  const messages = messagesRef.value
+
+  if (!messages) {
+    return
+  }
+
+  const isScrollingUp = messages.scrollTop < lastMessagesScrollTop.value - 1
+  const bottomDistance = messages.scrollHeight - messages.scrollTop - messages.clientHeight
+
+  if (isScrollingUp) {
+    shouldStickToBottom.value = false
+  } else if (bottomDistance <= 1) {
+    shouldStickToBottom.value = true
+  }
+
+  lastMessagesScrollTop.value = messages.scrollTop
+}
+
+function handleMessagesWheel(event: WheelEvent) {
+  if (event.deltaY < 0) {
+    shouldStickToBottom.value = false
+  }
+}
+
+async function scrollMessagesToBottom(force = false) {
+  await nextTick()
+
+  const messages = messagesRef.value
+
+  if (!messages || (!force && !shouldStickToBottom.value)) {
+    return
+  }
+
+  messages.scrollTop = messages.scrollHeight
+  lastMessagesScrollTop.value = messages.scrollTop
+}
+
+watch(
+  latestEvent,
+  (event) => {
+    const force = event?.type === 'message' && event.role === 'user'
+
+    if (force) {
+      shouldStickToBottom.value = true
+    }
+
+    void scrollMessagesToBottom(force)
+  },
+  { flush: 'post' },
+)
+
+watch(
+  () => [store.selectedConversationId, store.draftConversationProjectId],
+  () => {
+    shouldStickToBottom.value = true
+    void scrollMessagesToBottom(true)
+  },
+  { flush: 'post' },
+)
+
+onMounted(() => {
+  void scrollMessagesToBottom(true)
+})
+
+function isStreamingAssistantMessage(message: ConversationMessageEvent): boolean {
+  return (
+    message.role === 'assistant' &&
+    message.responseDurationMs === undefined &&
+    latestEvent.value?.id === message.id &&
+    store.isConversationRunning(message.conversationId)
+  )
+}
 
 function avatarTransitionStyle(bubbleId: string): Record<string, string> {
+  if (bubbleId !== conversationBubbles.value.at(-1)?.id) {
+    return {}
+  }
+
   return {
     viewTransitionName: `conversation-avatar-${bubbleId.replace(/[^a-zA-Z0-9_-]/g, '-')}`,
   }
@@ -282,22 +349,6 @@ function formatAnswerDuration(durationMs: number): string {
   }
 
   return `${(durationMs / 1000).toFixed(1)}s`
-}
-
-function isSourceVisible(messageId: string): boolean {
-  return sourceMessageIds.value.has(messageId)
-}
-
-function toggleSource(messageId: string) {
-  const nextMessageIds = new Set(sourceMessageIds.value)
-
-  if (nextMessageIds.has(messageId)) {
-    nextMessageIds.delete(messageId)
-  } else {
-    nextMessageIds.add(messageId)
-  }
-
-  sourceMessageIds.value = nextMessageIds
 }
 
 function formatToolPayload(payload: string): string {
@@ -525,6 +576,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   flex: 1;
   flex-direction: column;
   gap: 12px;
+  justify-content: safe center;
   overflow-y: auto;
   padding: 18px;
 }
@@ -564,6 +616,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   flex-direction: column;
   gap: 12px;
   overflow: auto;
+  overscroll-behavior: contain;
   padding: 18px;
 }
 
@@ -623,32 +676,6 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   align-self: flex-end;
   border-color: var(--ui-color-primary-light-7);
   background: var(--ui-color-primary-light-9);
-}
-
-.message__actions {
-  display: flex;
-  justify-content: flex-end;
-  margin: -6px -8px 4px 0;
-}
-
-.message__toggle {
-  width: 28px;
-  min-width: 28px;
-  height: 28px;
-  color: var(--ui-text-color-secondary);
-}
-
-.message__source {
-  overflow: auto;
-  margin: 0;
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-  background: var(--ui-fill-color-light);
-  padding: 10px 12px;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-  font-size: 13px;
-  line-height: 1.6;
-  white-space: pre;
 }
 
 .message__tools {

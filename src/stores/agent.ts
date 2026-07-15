@@ -649,6 +649,54 @@ export const useAgentStore = defineStore('agent', {
       const abortController = new AbortController()
       activeRunControllers.set(runConversation.id, abortController)
       let streamingAssistantMessage: ChatMessage | undefined
+      let streamRenderTimer: ReturnType<typeof setTimeout> | undefined
+
+      const cancelStreamRender = () => {
+        if (streamRenderTimer !== undefined) {
+          clearTimeout(streamRenderTimer)
+          streamRenderTimer = undefined
+        }
+      }
+
+      const upsertVisibleMessage = (message: ChatMessage) => {
+        if (this.selectedConversationId !== runConversation.id) {
+          return
+        }
+
+        const eventIndex = this.events.findIndex((event) => event.id === message.id)
+
+        if (eventIndex >= 0) {
+          this.events.splice(eventIndex, 1, message)
+        } else {
+          this.events.push(message)
+        }
+      }
+
+      const removeVisibleMessage = (messageId: string) => {
+        if (this.selectedConversationId !== runConversation.id) {
+          return
+        }
+
+        const eventIndex = this.events.findIndex((event) => event.id === messageId)
+
+        if (eventIndex >= 0) {
+          this.events.splice(eventIndex, 1)
+        }
+      }
+
+      const scheduleStreamRender = () => {
+        if (streamRenderTimer !== undefined) {
+          return
+        }
+
+        streamRenderTimer = setTimeout(() => {
+          streamRenderTimer = undefined
+
+          if (streamingAssistantMessage) {
+            upsertVisibleMessage(streamingAssistantMessage)
+          }
+        }, 40)
+      }
 
       try {
         const runContext: AgentRunContext = {
@@ -728,18 +776,13 @@ export const useAgentStore = defineStore('agent', {
               updatedAt: timestamp,
             }
 
-            if (this.selectedConversationId === runConversation.id) {
-              this.events = sortCreated([
-                ...this.events.filter((event) => event.id !== streamingAssistantMessage?.id),
-                streamingAssistantMessage,
-              ])
-            }
+            scheduleStreamRender()
           },
           onAssistantStreamReset: () => {
-            if (streamingAssistantMessage && this.selectedConversationId === runConversation.id) {
-              this.events = this.events.filter(
-                (event) => event.id !== streamingAssistantMessage?.id,
-              )
+            cancelStreamRender()
+
+            if (streamingAssistantMessage) {
+              removeVisibleMessage(streamingAssistantMessage.id)
             }
 
             streamingAssistantMessage = undefined
@@ -761,18 +804,16 @@ export const useAgentStore = defineStore('agent', {
 
         await putRecord('conversationEvents', assistantMessage)
 
-        if (this.selectedConversationId === runConversation.id) {
-          this.events = sortCreated([
-            ...this.events.filter((event) => event.id !== assistantMessage.id),
-            assistantMessage,
-          ])
-        }
+        cancelStreamRender()
+        upsertVisibleMessage(assistantMessage)
 
         streamingAssistantMessage = undefined
 
       } finally {
-        if (streamingAssistantMessage && this.selectedConversationId === runConversation.id) {
-          this.events = this.events.filter((event) => event.id !== streamingAssistantMessage?.id)
+        cancelStreamRender()
+
+        if (streamingAssistantMessage) {
+          removeVisibleMessage(streamingAssistantMessage.id)
         }
 
         const conversation =

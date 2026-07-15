@@ -52,8 +52,6 @@
       "messageHeading": "临时资源："
     },
     "answerDuration": "回答耗时：{duration}",
-    "viewMarkdownSource": "查看原始 Markdown",
-    "previewMarkdown": "查看 Markdown 预览",
     "toolCall": "工具调用：{name}",
     "toolGroup": "工具调用 {count} 次",
     "toolGroupRunning": "{count} 个运行中",

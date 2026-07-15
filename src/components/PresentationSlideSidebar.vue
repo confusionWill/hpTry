@@ -21,6 +21,7 @@
               :src="thumbnailUrl(index + 1)"
               :title="t('workspace.livePreview.slideThumbnail', { page: index + 1 })"
             />
+            <span class="slide-sidebar__frame-mask" aria-hidden="true" />
           </span>
         </button>
       </li>
@@ -71,6 +72,7 @@ function thumbnailUrl(page: number): string {
   min-height: 0;
   flex: 1;
   overflow: auto;
+  overscroll-behavior: contain;
   background: var(--ui-bg-color);
 }
 
@@ -104,6 +106,7 @@ function thumbnailUrl(page: number): string {
 }
 
 .slide-sidebar__thumbnail {
+  position: relative;
   display: block;
   width: 100%;
   overflow: hidden;
@@ -142,6 +145,13 @@ function thumbnailUrl(page: number): string {
   pointer-events: none;
   transform: scale(0.125);
   transform-origin: top left;
+}
+
+.slide-sidebar__frame-mask {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: transparent;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -52,8 +52,6 @@
       "messageHeading": ".tmp assets:"
     },
     "answerDuration": "Answered in {duration}",
-    "viewMarkdownSource": "View raw Markdown",
-    "previewMarkdown": "View Markdown preview",
     "toolCall": "Tool call: {name}",
     "toolGroup": "{count} tool calls",
     "toolGroupRunning": "{count} running",
