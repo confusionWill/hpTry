@@ -25,7 +25,7 @@ export interface AgentRunContext {
 }
 
 export interface AgentRunHandlers {
-  createToolRun: (toolCall: ToolCall) => Promise<ToolRun>
+  createToolRun: (toolCall: ToolCall, stepSequence: number) => Promise<ToolRun>
   updateToolRun: (
     run: ToolRun,
     patch: Pick<ToolRun, 'status' | 'output' | 'error'>,
@@ -37,6 +37,11 @@ export interface AgentRunHandlers {
   renameDirectory: (fromPath: string, toPath: string) => Promise<WorkspaceFile[]>
 }
 
+export interface AgentConversationResult {
+  content: string
+  finalStepSequence: number
+}
+
 function toChatMessages(systemPrompt: string, events: ConversationEvent[]): ChatMessageParam[] {
   const messages: ChatMessageParam[] = [
     {
@@ -45,38 +50,69 @@ function toChatMessages(systemPrompt: string, events: ConversationEvent[]): Chat
     },
   ]
 
-  for (const event of events) {
+  for (let eventIndex = 0; eventIndex < events.length; ) {
+    const event = events[eventIndex]
+
     if (event.type === 'message') {
       messages.push({
         role: event.role,
         content: event.content,
       })
+      eventIndex += 1
       continue
     }
 
-    if (event.status === 'running') {
+    const toolStep: ToolRun[] = []
+    let toolEventIndex = eventIndex
+
+    while (toolEventIndex < events.length) {
+      const toolEvent = events[toolEventIndex]
+
+      if (
+        toolEvent.type !== 'tool' ||
+        toolEvent.turnId !== event.turnId ||
+        toolEvent.stepSequence !== event.stepSequence
+      ) {
+        break
+      }
+
+      if (toolEvent.status !== 'running') {
+        toolStep.push(toolEvent)
+      }
+
+      toolEventIndex += 1
+    }
+
+    eventIndex = toolEventIndex
+
+    if (toolStep.length === 0) {
       continue
     }
 
     messages.push({
       role: 'assistant',
       content: null,
-      tool_calls: [
-        {
-          id: event.toolCallId,
-          type: 'function',
-          function: {
-            name: event.toolName,
-            arguments: event.input,
-          },
+      tool_calls: toolStep.map((tool) => ({
+        id: tool.toolCallId,
+        type: 'function',
+        function: {
+          name: tool.toolName,
+          arguments: tool.input,
         },
-      ],
+      })),
     })
-    messages.push({
-      role: 'tool',
-      tool_call_id: event.toolCallId,
-      content: buildToolResultContent(event.status === 'success', event.output, event.error),
-    })
+
+    for (const tool of toolStep) {
+      messages.push({
+        role: 'tool',
+        tool_call_id: tool.toolCallId,
+        content: buildToolResultContent(
+          tool.status === 'success',
+          tool.output,
+          tool.error,
+        ),
+      })
+    }
   }
 
   return messages
@@ -98,12 +134,13 @@ function throwIfAborted(signal?: AbortSignal) {
 
 async function executeToolCall(
   toolCall: ToolCall,
+  stepSequence: number,
   runContext: AgentRunContext,
   handlers: AgentRunHandlers,
   signal?: AbortSignal,
 ): Promise<ChatMessageParam> {
   throwIfAborted(signal)
-  const run = await handlers.createToolRun(toolCall)
+  const run = await handlers.createToolRun(toolCall, stepSequence)
 
   try {
     throwIfAborted(signal)
@@ -164,12 +201,13 @@ export async function runAgentConversation(params: {
   runContext: AgentRunContext
   handlers: AgentRunHandlers
   signal?: AbortSignal
-  onAssistantStream?: (content: string) => void
+  onAssistantStream?: (content: string, stepSequence: number) => void
   onAssistantStreamReset?: () => void
-}): Promise<string> {
+}): Promise<AgentConversationResult> {
   const agentMessages = toChatMessages(params.systemPrompt, params.events)
 
   for (let round = 0; round < MAX_AGENT_TOOL_ROUNDS; round += 1) {
+    const stepSequence = round + 1
     throwIfAborted(params.signal)
     const response = await requestChatCompletion({
       provider: params.runContext.provider,
@@ -177,13 +215,16 @@ export async function runAgentConversation(params: {
       tools: hpTryTools,
       toolChoice: 'auto',
       signal: params.signal,
-      onTextDelta: (_delta, content) => params.onAssistantStream?.(content),
+      onTextDelta: (_delta, content) => params.onAssistantStream?.(content, stepSequence),
     })
     throwIfAborted(params.signal)
     const toolCalls = response.message.tool_calls ?? []
 
     if (toolCalls.length === 0) {
-      return response.message.content?.trim() ?? ''
+      return {
+        content: response.message.content?.trim() ?? '',
+        finalStepSequence: stepSequence,
+      }
     }
 
     params.onAssistantStreamReset?.()
@@ -197,6 +238,7 @@ export async function runAgentConversation(params: {
     for (const toolCall of toolCalls) {
       const toolMessage = await executeToolCall(
         toolCall,
+        stepSequence,
         params.runContext,
         params.handlers,
         params.signal,
@@ -206,7 +248,10 @@ export async function runAgentConversation(params: {
     }
   }
 
-  return ''
+  return {
+    content: '',
+    finalStepSequence: MAX_AGENT_TOOL_ROUNDS,
+  }
 }
 
 export async function generateConversationTitle(params: {

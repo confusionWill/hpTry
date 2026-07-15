@@ -1,5 +1,6 @@
 export type MessageRole = 'system' | 'user' | 'assistant'
 export type ToolRunStatus = 'running' | 'success' | 'error'
+export type ConversationTurnStatus = 'running' | 'completed' | 'error' | 'stopped'
 export type ConversationEventType = 'message' | 'tool'
 
 export interface Project {
@@ -18,14 +19,31 @@ export interface Conversation {
   updatedAt: number
 }
 
-export interface ConversationMessageEvent {
+export interface ConversationTurn {
   id: string
   conversationId: string
+  sequence: number
+  status: ConversationTurnStatus
+  createdAt: number
+  updatedAt: number
+  completedAt?: number
+  responseDurationMs?: number
+}
+
+interface BaseConversationEvent {
+  id: string
+  conversationId: string
+  turnId: string
+  sequence: number
+  stepSequence: number
+  createdAt: number
+  updatedAt: number
+}
+
+export interface ConversationMessageEvent extends BaseConversationEvent {
   type: 'message'
   role: MessageRole
   content: string
-  createdAt: number
-  updatedAt: number
   responseDurationMs?: number
 }
 
@@ -73,9 +91,7 @@ export interface WorkspaceAsset {
   updatedAt: number
 }
 
-export interface ConversationToolEvent {
-  id: string
-  conversationId: string
+export interface ConversationToolEvent extends BaseConversationEvent {
   type: 'tool'
   toolCallId: string
   toolName: string
@@ -83,8 +99,6 @@ export interface ConversationToolEvent {
   input: string
   output: string
   error: string
-  createdAt: number
-  updatedAt: number
 }
 
 export type ConversationEvent = ConversationMessageEvent | ConversationToolEvent

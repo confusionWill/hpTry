@@ -42,6 +42,7 @@
     "stop": "停止",
     "stopping": "停止中",
     "stopped": "已停止生成。",
+    "loadingOlder": "正在加载更早的消息…",
     "upload": {
       "selectFiles": "上传资源",
       "removeFile": "删除已上传文件 {name}",

@@ -47,6 +47,9 @@
             class="messages"
             @scroll="handleMessagesScroll"
           >
+            <div v-if="store.loadingOlderTurns" class="messages__history-status">
+              {{ t('conversation.loadingOlder') }}
+            </div>
             <template v-for="bubble in conversationBubbles" :key="bubble.id">
               <div
                 v-if="bubble.type === 'user'"
@@ -185,8 +188,14 @@ const canChat = computed(() => Boolean(store.selectedConversationId || store.isD
 const conversationBubbles = computed<ConversationBubble[]>(() => {
   const bubbles: ConversationBubble[] = []
   let currentAssistantBubble: Extract<ConversationBubble, { type: 'assistant' }> | undefined
+  let currentTurnId = ''
 
   for (const event of store.events) {
+    if (event.turnId !== currentTurnId) {
+      currentTurnId = event.turnId
+      currentAssistantBubble = undefined
+    }
+
     if (event.type === 'message' && event.role === 'user') {
       bubbles.push({
         id: event.id,
@@ -251,6 +260,38 @@ function handleMessagesScroll() {
   }
 
   lastMessagesScrollTop.value = messages.scrollTop
+
+  if (messages.scrollTop <= 80 && store.hasOlderTurns && !store.loadingOlderTurns) {
+    void loadOlderMessages()
+  }
+}
+
+async function loadOlderMessages(fillViewport = false) {
+  const messages = messagesRef.value
+  const conversationId = store.selectedConversationId
+
+  if (!messages || !conversationId || !store.hasOlderTurns || store.loadingOlderTurns) {
+    return
+  }
+
+  do {
+    const previousScrollHeight = messages.scrollHeight
+    const previousScrollTop = messages.scrollTop
+
+    await store.loadOlderConversationTurns()
+    await nextTick()
+
+    if (messagesRef.value !== messages || store.selectedConversationId !== conversationId) {
+      return
+    }
+
+    messages.scrollTop = previousScrollTop + messages.scrollHeight - previousScrollHeight
+    lastMessagesScrollTop.value = messages.scrollTop
+  } while (
+    fillViewport &&
+    messages.scrollHeight <= messages.clientHeight &&
+    store.hasOlderTurns
+  )
 }
 
 async function scrollMessagesToBottom(force = false) {
@@ -264,6 +305,10 @@ async function scrollMessagesToBottom(force = false) {
 
   messages.scrollTop = messages.scrollHeight
   lastMessagesScrollTop.value = messages.scrollTop
+
+  if (!props.collapsed && messages.scrollHeight <= messages.clientHeight && store.hasOlderTurns) {
+    await loadOlderMessages(true)
+  }
 }
 
 watch(
@@ -624,6 +669,13 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   overflow: auto;
   overscroll-behavior: contain;
   padding: 18px;
+}
+
+.messages__history-status {
+  color: var(--ui-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
 }
 
 .message-row {

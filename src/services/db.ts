@@ -1,6 +1,7 @@
 import type {
-  ConversationEvent,
   Conversation,
+  ConversationEvent,
+  ConversationTurn,
   Project,
   Provider,
   WorkspaceAsset,
@@ -8,11 +9,12 @@ import type {
 } from '@/types/agent'
 
 const DB_NAME = 'hpTry'
-const DB_VERSION = 6
+const DB_VERSION = 7
 
 export type StoreName =
   | 'projects'
   | 'conversations'
+  | 'conversationTurns'
   | 'conversationEvents'
   | 'providers'
   | 'workspaceAssets'
@@ -21,6 +23,7 @@ export type StoreName =
 export interface StoreMap {
   projects: Project
   conversations: Conversation
+  conversationTurns: ConversationTurn
   conversationEvents: ConversationEvent
   providers: Provider
   workspaceAssets: WorkspaceAsset
@@ -28,42 +31,6 @@ export interface StoreMap {
 }
 
 let databasePromise: Promise<IDBDatabase> | null = null
-
-function ensureIndex(
-  store: IDBObjectStore,
-  indexName: string,
-  keyPath: string | string[],
-  options?: IDBIndexParameters,
-): void {
-  if (!store.indexNames.contains(indexName)) {
-    store.createIndex(indexName, keyPath, options)
-  }
-}
-
-function dedupeWorkspaceFilesBeforeProjectPathIndex(store: IDBObjectStore): void {
-  const seen = new Set<string>()
-  const cursorRequest = store.openCursor()
-
-  cursorRequest.onsuccess = () => {
-    const cursor = cursorRequest.result
-
-    if (!cursor) {
-      ensureIndex(store, 'projectPath', ['projectId', 'path'], { unique: true })
-      return
-    }
-
-    const file = cursor.value as WorkspaceFile
-    const key = `${file.projectId}\0${file.path}`
-
-    if (seen.has(key)) {
-      cursor.delete()
-    } else {
-      seen.add(key)
-    }
-
-    cursor.continue()
-  }
-}
 
 function openDatabase(): Promise<IDBDatabase> {
   if (databasePromise) {
@@ -79,66 +46,32 @@ function openDatabase(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => {
       const db = request.result
 
-      if (!db.objectStoreNames.contains('projects')) {
-        db.createObjectStore('projects', { keyPath: 'id' })
-      }
+      db.createObjectStore('projects', { keyPath: 'id' })
 
-      if (!db.objectStoreNames.contains('conversations')) {
-        const store = db.createObjectStore('conversations', { keyPath: 'id' })
-        store.createIndex('projectId', 'projectId')
-      } else {
-        const store = request.transaction?.objectStore('conversations')
+      const conversationStore = db.createObjectStore('conversations', { keyPath: 'id' })
+      conversationStore.createIndex('projectId', 'projectId')
 
-        if (store) {
-          ensureIndex(store, 'projectId', 'projectId')
-        }
-      }
+      const turnStore = db.createObjectStore('conversationTurns', { keyPath: 'id' })
+      turnStore.createIndex('conversationId', 'conversationId')
+      turnStore.createIndex('conversationSequence', ['conversationId', 'sequence'], {
+        unique: true,
+      })
 
-      if (!db.objectStoreNames.contains('conversationEvents')) {
-        const store = db.createObjectStore('conversationEvents', { keyPath: 'id' })
-        store.createIndex('conversationId', 'conversationId')
-      } else {
-        const store = request.transaction?.objectStore('conversationEvents')
+      const eventStore = db.createObjectStore('conversationEvents', { keyPath: 'id' })
+      eventStore.createIndex('conversationId', 'conversationId')
+      eventStore.createIndex('turnId', 'turnId')
 
-        if (store) {
-          ensureIndex(store, 'conversationId', 'conversationId')
-        }
-      }
+      db.createObjectStore('providers', { keyPath: 'id' })
 
-      if (!db.objectStoreNames.contains('providers')) {
-        db.createObjectStore('providers', { keyPath: 'id' })
-      }
+      const workspaceFileStore = db.createObjectStore('workspaceFiles', { keyPath: 'id' })
+      workspaceFileStore.createIndex('projectId', 'projectId')
+      workspaceFileStore.createIndex('path', 'path')
+      workspaceFileStore.createIndex('projectPath', ['projectId', 'path'], { unique: true })
 
-      if (!db.objectStoreNames.contains('workspaceFiles')) {
-        const store = db.createObjectStore('workspaceFiles', { keyPath: 'id' })
-        store.createIndex('projectId', 'projectId')
-        store.createIndex('path', 'path')
-        store.createIndex('projectPath', ['projectId', 'path'], { unique: true })
-      } else {
-        const store = request.transaction?.objectStore('workspaceFiles')
-
-        if (store) {
-          ensureIndex(store, 'projectId', 'projectId')
-          ensureIndex(store, 'path', 'path')
-          dedupeWorkspaceFilesBeforeProjectPathIndex(store)
-        }
-      }
-
-      if (!db.objectStoreNames.contains('workspaceAssets')) {
-        const store = db.createObjectStore('workspaceAssets', { keyPath: 'id' })
-        store.createIndex('projectId', 'projectId')
-        store.createIndex('path', 'path')
-        store.createIndex('projectPath', ['projectId', 'path'], { unique: true })
-      } else {
-        const store = request.transaction?.objectStore('workspaceAssets')
-
-        if (store) {
-          ensureIndex(store, 'projectId', 'projectId')
-          ensureIndex(store, 'path', 'path')
-          ensureIndex(store, 'projectPath', ['projectId', 'path'], { unique: true })
-        }
-      }
-
+      const workspaceAssetStore = db.createObjectStore('workspaceAssets', { keyPath: 'id' })
+      workspaceAssetStore.createIndex('projectId', 'projectId')
+      workspaceAssetStore.createIndex('path', 'path')
+      workspaceAssetStore.createIndex('projectPath', ['projectId', 'path'], { unique: true })
     }
   })
 
@@ -209,6 +142,37 @@ export async function getRecordsByIndex<TName extends StoreName>(
   const index = store.index(indexName)
 
   return requestResult<StoreMap[TName][]>(index.getAll(value))
+}
+
+export async function getRecordsByIndexCursor<TName extends StoreName>(
+  storeName: TName,
+  indexName: string,
+  range: IDBKeyRange,
+  direction: IDBCursorDirection,
+  limit: number,
+): Promise<StoreMap[TName][]> {
+  const db = await openDatabase()
+  const transaction = db.transaction(storeName, 'readonly')
+  const store = transaction.objectStore(storeName)
+  const index = store.index(indexName)
+
+  return new Promise((resolve, reject) => {
+    const records: StoreMap[TName][] = []
+    const request = index.openCursor(range, direction)
+
+    request.onerror = () => reject(request.error)
+    request.onsuccess = () => {
+      const cursor = request.result
+
+      if (!cursor || records.length >= limit) {
+        resolve(records)
+        return
+      }
+
+      records.push(cursor.value as StoreMap[TName])
+      cursor.continue()
+    }
+  })
 }
 
 export async function deleteRecordsByIndex(

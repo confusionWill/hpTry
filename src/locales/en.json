@@ -42,6 +42,7 @@
     "stop": "Stop",
     "stopping": "Stopping",
     "stopped": "Generation stopped.",
+    "loadingOlder": "Loading earlier messages…",
     "upload": {
       "selectFiles": "Upload assets",
       "removeFile": "Delete uploaded file {name}",

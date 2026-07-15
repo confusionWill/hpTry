@@ -12,6 +12,7 @@ import {
   getAllRecords,
   getRecord,
   getRecordsByIndex,
+  getRecordsByIndexCursor,
   putRecord,
 } from '@/services/db'
 import {
@@ -30,6 +31,7 @@ import type {
   ChatMessage,
   Conversation,
   ConversationEvent,
+  ConversationTurn,
   Project,
   ProjectPayload,
   Provider,
@@ -38,15 +40,91 @@ import type {
   ToolRun,
   WorkspaceFile,
 } from '@/types/agent'
-import { createId, now, sortCreated, sortUpdated } from '@/utils/records'
+import { createId, now, sortUpdated } from '@/utils/records'
 
 const SELECTED_PROJECT_STORAGE_KEY = 'hpTry:selected-project-id'
 const SELECTED_PROVIDER_STORAGE_KEY = 'hpTry:selected-provider-id'
+const CONVERSATION_TURN_PAGE_SIZE = 10
 const activeRunControllers = new Map<string, AbortController>()
 
 interface ActiveAgentRun {
   projectId: string
   conversationId: string
+}
+
+interface ConversationTurnPage {
+  turns: ConversationTurn[]
+  events: ConversationEvent[]
+  hasOlder: boolean
+}
+
+function sortTurns(turns: ConversationTurn[]): ConversationTurn[] {
+  return [...turns].sort((left, right) => left.sequence - right.sequence)
+}
+
+function sortTurnEvents(events: ConversationEvent[]): ConversationEvent[] {
+  return [...events].sort((left, right) => left.sequence - right.sequence)
+}
+
+async function loadEventsForTurns(turns: ConversationTurn[]): Promise<ConversationEvent[]> {
+  const eventGroups = await Promise.all(
+    turns.map((turn) => getRecordsByIndex('conversationEvents', 'turnId', turn.id)),
+  )
+
+  return eventGroups.flatMap(sortTurnEvents)
+}
+
+async function loadConversationTurnPage(
+  conversationId: string,
+  beforeSequence?: number,
+): Promise<ConversationTurnPage> {
+  const lowerBound: [string, number] = [conversationId, 0]
+  const upperBound: [string, number] = [
+    conversationId,
+    beforeSequence ?? Number.MAX_SAFE_INTEGER,
+  ]
+  const range = IDBKeyRange.bound(
+    lowerBound,
+    upperBound,
+    false,
+    beforeSequence !== undefined,
+  )
+  const records = await getRecordsByIndexCursor(
+    'conversationTurns',
+    'conversationSequence',
+    range,
+    'prev',
+    CONVERSATION_TURN_PAGE_SIZE + 1,
+  )
+  const hasOlder = records.length > CONVERSATION_TURN_PAGE_SIZE
+  const turns = sortTurns(records.slice(0, CONVERSATION_TURN_PAGE_SIZE))
+
+  return {
+    turns,
+    events: await loadEventsForTurns(turns),
+    hasOlder,
+  }
+}
+
+async function loadConversationHistory(conversationId: string): Promise<{
+  turns: ConversationTurn[]
+  events: ConversationEvent[]
+}> {
+  const turns = sortTurns(
+    await getRecordsByIndex('conversationTurns', 'conversationId', conversationId),
+  )
+  const turnSequences = new Map(turns.map((turn) => [turn.id, turn.sequence]))
+  const events = await getRecordsByIndex('conversationEvents', 'conversationId', conversationId)
+
+  events.sort((left, right) => {
+    const turnDifference =
+      (turnSequences.get(left.turnId) ?? Number.MAX_SAFE_INTEGER) -
+      (turnSequences.get(right.turnId) ?? Number.MAX_SAFE_INTEGER)
+
+    return turnDifference || left.sequence - right.sequence
+  })
+
+  return { turns, events }
 }
 
 export type WorkspaceUploadPayload =
@@ -97,6 +175,7 @@ export const useAgentStore = defineStore('agent', {
   state: () => ({
     projects: [] as Project[],
     conversations: [] as Conversation[],
+    turns: [] as ConversationTurn[],
     events: [] as ConversationEvent[],
     providers: [] as Provider[],
     workspaceFiles: [] as WorkspaceFile[],
@@ -111,6 +190,8 @@ export const useAgentStore = defineStore('agent', {
     stoppingConversationIds: [] as string[],
     projectLoadToken: 0,
     conversationLoadToken: 0,
+    loadingOlderTurns: false,
+    hasOlderTurns: false,
   }),
   getters: {
     selectedProject(state): Project | undefined {
@@ -208,7 +289,10 @@ export const useAgentStore = defineStore('agent', {
       this.conversations = conversations
       this.selectedConversationId = startNewConversation ? '' : (this.conversations[0]?.id ?? '')
       this.draftConversationProjectId = startNewConversation ? projectId : ''
+      this.turns = []
       this.events = []
+      this.hasOlderTurns = false
+      this.loadingOlderTurns = false
       this.conversationLoadToken += 1
       await this.loadWorkspaceFiles(projectId, loadToken)
 
@@ -219,7 +303,10 @@ export const useAgentStore = defineStore('agent', {
       if (this.selectedConversationId) {
         await this.selectConversation(this.selectedConversationId)
       } else {
+        this.turns = []
         this.events = []
+        this.hasOlderTurns = false
+        this.loadingOlderTurns = false
       }
     },
     async loadWorkspaceFiles(projectId: string, loadToken?: number) {
@@ -277,6 +364,7 @@ export const useAgentStore = defineStore('agent', {
       await Promise.all(
         conversations.map(async (conversation) => {
           await deleteRecordsByIndex('conversationEvents', 'conversationId', conversation.id)
+          await deleteRecordsByIndex('conversationTurns', 'conversationId', conversation.id)
         }),
       )
       await deleteRecordsByIndex('workspaceFiles', 'projectId', projectId)
@@ -292,11 +380,14 @@ export const useAgentStore = defineStore('agent', {
         await this.selectProject(this.selectedProjectId)
       } else {
         this.conversations = []
+        this.turns = []
         this.events = []
         this.workspaceFiles = []
         this.selectedConversationId = ''
         this.selectedWorkspaceFilePath = ''
         this.draftConversationProjectId = ''
+        this.hasOlderTurns = false
+        this.loadingOlderTurns = false
       }
     },
     stopProjectRun(projectId: string) {
@@ -327,7 +418,10 @@ export const useAgentStore = defineStore('agent', {
 
       this.draftConversationProjectId = this.selectedProjectId
       this.selectedConversationId = ''
+      this.turns = []
       this.events = []
+      this.hasOlderTurns = false
+      this.loadingOlderTurns = false
       this.conversationLoadToken += 1
     },
     async selectConversation(conversationId: string) {
@@ -345,10 +439,13 @@ export const useAgentStore = defineStore('agent', {
 
       this.selectedConversationId = conversationId
       this.draftConversationProjectId = ''
+      this.turns = []
       this.events = []
+      this.hasOlderTurns = false
+      this.loadingOlderTurns = false
       this.conversationLoadToken = loadToken
 
-      const events = await getRecordsByIndex('conversationEvents', 'conversationId', conversationId)
+      const page = await loadConversationTurnPage(conversationId)
 
       if (
         this.conversationLoadToken !== loadToken ||
@@ -358,7 +455,42 @@ export const useAgentStore = defineStore('agent', {
         return
       }
 
-      this.events = sortCreated(events)
+      this.turns = page.turns
+      this.events = page.events
+      this.hasOlderTurns = page.hasOlder
+    },
+    async loadOlderConversationTurns() {
+      const conversationId = this.selectedConversationId
+      const oldestTurn = this.turns[0]
+
+      if (!conversationId || !oldestTurn || !this.hasOlderTurns || this.loadingOlderTurns) {
+        return
+      }
+
+      const loadToken = this.conversationLoadToken
+      this.loadingOlderTurns = true
+
+      try {
+        const page = await loadConversationTurnPage(conversationId, oldestTurn.sequence)
+
+        if (
+          this.conversationLoadToken !== loadToken ||
+          this.selectedConversationId !== conversationId
+        ) {
+          return
+        }
+
+        this.turns = [...page.turns, ...this.turns]
+        this.events = [...page.events, ...this.events]
+        this.hasOlderTurns = page.hasOlder
+      } finally {
+        if (
+          this.conversationLoadToken === loadToken &&
+          this.selectedConversationId === conversationId
+        ) {
+          this.loadingOlderTurns = false
+        }
+      }
     },
     selectProvider(providerId: string) {
       this.selectedProviderId = providerId
@@ -373,12 +505,16 @@ export const useAgentStore = defineStore('agent', {
       }
 
       await deleteRecordsByIndex('conversationEvents', 'conversationId', conversationId)
+      await deleteRecordsByIndex('conversationTurns', 'conversationId', conversationId)
       await deleteRecord('conversations', conversationId)
       this.conversations = this.conversations.filter(
         (conversation) => conversation.id !== conversationId,
       )
       this.selectedConversationId = this.conversations[0]?.id ?? ''
+      this.turns = []
       this.events = []
+      this.hasOlderTurns = false
+      this.loadingOlderTurns = false
       this.conversationLoadToken += 1
 
       if (this.selectedConversationId) {
@@ -548,6 +684,9 @@ export const useAgentStore = defineStore('agent', {
     },
     async createToolRun(
       conversationId: string,
+      turnId: string,
+      sequence: number,
+      stepSequence: number,
       events: ConversationEvent[],
       toolCall: ToolCall,
     ): Promise<ToolRun> {
@@ -555,6 +694,9 @@ export const useAgentStore = defineStore('agent', {
       const run: ToolRun = {
         id: createId('tool'),
         conversationId,
+        turnId,
+        sequence,
+        stepSequence,
         type: 'tool',
         toolCallId: toolCall.id,
         toolName: toolCall.function.name,
@@ -567,11 +709,10 @@ export const useAgentStore = defineStore('agent', {
       }
 
       await putRecord('conversationEvents', run)
-      const nextEvents = sortCreated([...events, run])
-      events.splice(0, events.length, ...nextEvents)
+      events.push(run)
 
       if (this.selectedConversationId === conversationId) {
-        this.events = nextEvents
+        this.events.push(run)
       }
 
       return run
@@ -588,11 +729,18 @@ export const useAgentStore = defineStore('agent', {
       }
 
       await putRecord('conversationEvents', updated)
-      const nextEvents = sortCreated([...events.filter((item) => item.id !== updated.id), updated])
-      events.splice(0, events.length, ...nextEvents)
+      const runContextEventIndex = events.findIndex((item) => item.id === updated.id)
+
+      if (runContextEventIndex >= 0) {
+        events.splice(runContextEventIndex, 1, updated)
+      }
 
       if (this.selectedConversationId === updated.conversationId) {
-        this.events = nextEvents
+        const visibleEventIndex = this.events.findIndex((item) => item.id === updated.id)
+
+        if (visibleEventIndex >= 0) {
+          this.events.splice(visibleEventIndex, 1, updated)
+        }
       }
     },
     async sendMessage(
@@ -650,6 +798,8 @@ export const useAgentStore = defineStore('agent', {
       activeRunControllers.set(runConversation.id, abortController)
       let streamingAssistantMessage: ChatMessage | undefined
       let streamRenderTimer: ReturnType<typeof setTimeout> | undefined
+      let conversationTurn: ConversationTurn | undefined
+      let eventSequence = 0
 
       const cancelStreamRender = () => {
         if (streamRenderTimer !== undefined) {
@@ -698,29 +848,57 @@ export const useAgentStore = defineStore('agent', {
         }, 40)
       }
 
+      const updateVisibleTurn = (turn: ConversationTurn) => {
+        if (this.selectedConversationId !== turn.conversationId) {
+          return
+        }
+
+        const turnIndex = this.turns.findIndex((item) => item.id === turn.id)
+
+        if (turnIndex >= 0) {
+          this.turns.splice(turnIndex, 1, turn)
+        } else {
+          this.turns.push(turn)
+        }
+      }
+
       try {
+        const history = await loadConversationHistory(runConversation.id)
         const runContext: AgentRunContext = {
           project: runProject,
           conversation: runConversation,
           provider: runProvider,
           files: await loadProjectWorkspaceFiles(runProject.id),
-          events: sortCreated(
-            await getRecordsByIndex('conversationEvents', 'conversationId', runConversation.id),
-          ),
+          events: history.events,
         }
         const timestamp = now()
+        conversationTurn = {
+          id: createId('turn'),
+          conversationId: runConversation.id,
+          sequence: (history.turns.at(-1)?.sequence ?? -1) + 1,
+          status: 'running',
+          createdAt: timestamp,
+          updatedAt: timestamp,
+        }
+        await putRecord('conversationTurns', conversationTurn)
+        updateVisibleTurn(conversationTurn)
+
         const userMessage: ChatMessage = {
           id: createId('message'),
           conversationId: runConversation.id,
+          turnId: conversationTurn.id,
+          sequence: eventSequence,
+          stepSequence: 0,
           type: 'message',
           role: 'user',
           content,
           createdAt: timestamp,
           updatedAt: timestamp,
         }
+        eventSequence += 1
 
         await putRecord('conversationEvents', userMessage)
-        runContext.events = sortCreated([...runContext.events, userMessage])
+        runContext.events.push(userMessage)
 
         if (this.selectedConversationId === runConversation.id) {
           this.events = [...this.events, userMessage]
@@ -744,14 +922,25 @@ export const useAgentStore = defineStore('agent', {
           }
         }
 
-        const finalContent = await runAgentConversation({
+        const result = await runAgentConversation({
           systemPrompt,
           events: runContext.events,
           runContext,
           signal: abortController.signal,
           handlers: {
-            createToolRun: (toolCall) =>
-              this.createToolRun(runConversation.id, runContext.events, toolCall),
+            createToolRun: (toolCall, stepSequence) => {
+              const sequence = eventSequence
+              eventSequence += 1
+
+              return this.createToolRun(
+                runConversation.id,
+                conversationTurn!.id,
+                sequence,
+                stepSequence,
+                runContext.events,
+                toolCall,
+              )
+            },
             updateToolRun: (run, patch) => this.updateToolRun(runContext.events, run, patch),
             writeFile: (path, fileContent) =>
               this.upsertWorkspaceFile(runProject.id, runContext.files, path, fileContent),
@@ -763,12 +952,15 @@ export const useAgentStore = defineStore('agent', {
             renameDirectory: (fromPath, toPath) =>
               this.renameWorkspaceDirectory(runProject.id, runContext.files, fromPath, toPath),
           },
-          onAssistantStream: (streamedContent) => {
+          onAssistantStream: (streamedContent, stepSequence) => {
             const timestamp = now()
 
             streamingAssistantMessage = {
               id: streamingAssistantMessage?.id ?? createId('message'),
               conversationId: runConversation.id,
+              turnId: conversationTurn!.id,
+              sequence: streamingAssistantMessage?.sequence ?? eventSequence,
+              stepSequence,
               type: 'message',
               role: 'assistant',
               content: streamedContent,
@@ -794,9 +986,12 @@ export const useAgentStore = defineStore('agent', {
         const assistantMessage: ChatMessage = {
           id: streamingAssistantMessage?.id ?? createId('message'),
           conversationId: runConversation.id,
+          turnId: conversationTurn.id,
+          sequence: streamingAssistantMessage?.sequence ?? eventSequence,
+          stepSequence: result.finalStepSequence,
           type: 'message',
           role: 'assistant',
-          content: finalContent || emptyFinalMessage,
+          content: result.content || emptyFinalMessage,
           createdAt: streamingAssistantMessage?.createdAt ?? responseEndedAt,
           updatedAt: responseEndedAt,
           responseDurationMs: responseEndedAt - userMessage.createdAt,
@@ -809,11 +1004,36 @@ export const useAgentStore = defineStore('agent', {
 
         streamingAssistantMessage = undefined
 
+        const completedTurn: ConversationTurn = {
+          ...conversationTurn,
+          status: 'completed',
+          updatedAt: responseEndedAt,
+          completedAt: responseEndedAt,
+          responseDurationMs: responseEndedAt - userMessage.createdAt,
+        }
+        await putRecord('conversationTurns', completedTurn)
+        conversationTurn = completedTurn
+        updateVisibleTurn(completedTurn)
+
       } finally {
         cancelStreamRender()
 
         if (streamingAssistantMessage) {
           removeVisibleMessage(streamingAssistantMessage.id)
+        }
+
+        if (conversationTurn?.status === 'running') {
+          const endedAt = now()
+          const endedTurn: ConversationTurn = {
+            ...conversationTurn,
+            status: abortController.signal.aborted ? 'stopped' : 'error',
+            updatedAt: endedAt,
+            completedAt: endedAt,
+          }
+
+          await putRecord('conversationTurns', endedTurn)
+          conversationTurn = endedTurn
+          updateVisibleTurn(endedTurn)
         }
 
         const conversation =
