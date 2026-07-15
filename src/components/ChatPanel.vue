@@ -218,6 +218,9 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
   return bubbles
 })
 const collapsedConversationBubbles = computed(() => conversationBubbles.value.slice(-8))
+const transitioningBubbleIds = computed(
+  () => new Set(collapsedConversationBubbles.value.map((bubble) => bubble.id)),
+)
 const conversationTitle = computed(() => {
   if (store.selectedConversation) {
     return store.selectedConversation.title
@@ -300,7 +303,7 @@ function isStreamingAssistantMessage(message: ConversationMessageEvent): boolean
 }
 
 function avatarTransitionStyle(bubbleId: string): Record<string, string> {
-  if (bubbleId !== conversationBubbles.value.at(-1)?.id) {
+  if (!transitioningBubbleIds.value.has(bubbleId)) {
     return {}
   }
 
