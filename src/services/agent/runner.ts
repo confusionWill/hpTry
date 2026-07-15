@@ -25,7 +25,11 @@ export interface AgentRunContext {
 }
 
 export interface AgentRunHandlers {
-  createToolRun: (toolCall: ToolCall, stepSequence: number) => Promise<ToolRun>
+  createToolRun: (
+    toolCall: ToolCall,
+    stepSequence: number,
+    reasoningContent?: string,
+  ) => Promise<ToolRun>
   updateToolRun: (
     run: ToolRun,
     patch: Pick<ToolRun, 'status' | 'output' | 'error'>,
@@ -92,6 +96,7 @@ function toChatMessages(systemPrompt: string, events: ConversationEvent[]): Chat
     messages.push({
       role: 'assistant',
       content: null,
+      reasoning_content: toolStep.find((tool) => tool.reasoningContent)?.reasoningContent,
       tool_calls: toolStep.map((tool) => ({
         id: tool.toolCallId,
         type: 'function',
@@ -135,12 +140,13 @@ function throwIfAborted(signal?: AbortSignal) {
 async function executeToolCall(
   toolCall: ToolCall,
   stepSequence: number,
+  reasoningContent: string | undefined,
   runContext: AgentRunContext,
   handlers: AgentRunHandlers,
   signal?: AbortSignal,
 ): Promise<ChatMessageParam> {
   throwIfAborted(signal)
-  const run = await handlers.createToolRun(toolCall, stepSequence)
+  const run = await handlers.createToolRun(toolCall, stepSequence, reasoningContent)
 
   try {
     throwIfAborted(signal)
@@ -213,7 +219,6 @@ export async function runAgentConversation(params: {
       provider: params.runContext.provider,
       messages: agentMessages,
       tools: hpTryTools,
-      toolChoice: 'auto',
       signal: params.signal,
       onTextDelta: (_delta, content) => params.onAssistantStream?.(content, stepSequence),
     })
@@ -232,13 +237,15 @@ export async function runAgentConversation(params: {
     agentMessages.push({
       role: 'assistant',
       content: response.message.content ?? null,
+      reasoning_content: response.message.reasoning_content,
       tool_calls: toolCalls,
     })
 
-    for (const toolCall of toolCalls) {
+    for (const [toolCallIndex, toolCall] of toolCalls.entries()) {
       const toolMessage = await executeToolCall(
         toolCall,
         stepSequence,
+        toolCallIndex === 0 ? (response.message.reasoning_content ?? undefined) : undefined,
         params.runContext,
         params.handlers,
         params.signal,
@@ -272,7 +279,6 @@ export async function generateConversationTitle(params: {
         content: params.userMessage,
       },
     ],
-    toolChoice: 'none',
     signal: params.signal,
     timeoutMs: 30_000,
   })

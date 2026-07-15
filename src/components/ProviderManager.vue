@@ -207,7 +207,6 @@ async function testProvider() {
           content: 'ok',
         },
       ],
-      toolChoice: 'none',
       timeoutMs: 15_000,
     })
     uiStore.showToast(t('provider.testSuccess'), 'success')

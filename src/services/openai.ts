@@ -4,6 +4,7 @@ import type { Provider, ToolCall } from '@/types/agent'
 export interface ChatMessageParam {
   role: 'system' | 'user' | 'assistant' | 'tool'
   content: string | null
+  reasoning_content?: string | null
   tool_calls?: ToolCall[]
   tool_call_id?: string
 }
@@ -11,6 +12,7 @@ export interface ChatMessageParam {
 export interface ChatCompletionMessage {
   role: 'assistant'
   content?: string | null
+  reasoning_content?: string | null
   tool_calls?: ToolCall[]
 }
 
@@ -31,6 +33,7 @@ interface ChatCompletionToolCallDelta {
 interface ChatCompletionDelta {
   role?: 'assistant'
   content?: string | null
+  reasoning_content?: string | null
   tool_calls?: ChatCompletionToolCallDelta[]
 }
 
@@ -101,14 +104,6 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.replace(/\/+$/, '')
 }
 
-function usesDeepSeekThinking(provider: Provider): boolean {
-  try {
-    return new URL(provider.baseUrl).hostname.toLowerCase() === 'api.deepseek.com'
-  } catch {
-    return false
-  }
-}
-
 function getErrorMessage(payload: unknown, fallback: string): string {
   if (
     typeof payload === 'object' &&
@@ -160,6 +155,7 @@ async function readChatCompletionStream(
   >()
   let buffer = ''
   let content = ''
+  let reasoningContent = ''
   let done = false
   let streamCompleted = false
 
@@ -209,6 +205,10 @@ async function readChatCompletionStream(
     if (delta.content) {
       content += delta.content
       onTextDelta?.(delta.content, content)
+    }
+
+    if (delta.reasoning_content) {
+      reasoningContent += delta.reasoning_content
     }
 
     for (const toolCall of delta.tool_calls ?? []) {
@@ -294,6 +294,7 @@ async function readChatCompletionStream(
     message: {
       role: 'assistant',
       content,
+      reasoning_content: reasoningContent || undefined,
       tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
     },
   }
@@ -303,7 +304,6 @@ export async function requestChatCompletion(params: {
   provider: Provider
   messages: ChatMessageParam[]
   tools?: ChatTool[]
-  toolChoice?: 'auto' | 'none'
   signal?: AbortSignal
   timeoutMs?: number
   onTextDelta?: (delta: string, content: string) => void
@@ -338,10 +338,7 @@ export async function requestChatCompletion(params: {
         model: params.provider.model,
         messages: params.messages,
         tools: params.tools,
-        tool_choice: params.tools ? (params.toolChoice ?? 'auto') : undefined,
         stream: true,
-        thinking: usesDeepSeekThinking(params.provider) ? { type: 'disabled' } : undefined,
-        // temperature: 0.2,
       }),
     })
   } catch (error) {
