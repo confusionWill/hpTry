@@ -63,6 +63,7 @@ withDefaults(
   line-height: 1;
   padding: 7px 12px;
   transition:
+    transform 0.15s ease,
     background-color 0.15s ease,
     border-color 0.15s ease,
     color 0.15s ease,
@@ -72,6 +73,7 @@ withDefaults(
 .ui-button:hover:not(:disabled) {
   border-color: var(--ui-color-primary);
   color: var(--ui-color-primary);
+  transform: translateY(-1px);
 }
 
 .ui-button:focus-visible {

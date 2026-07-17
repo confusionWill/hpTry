@@ -715,15 +715,13 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 
 .message {
   max-width: min(760px, 86%);
-  border: 1px solid var(--ui-border-color-light);
   border-radius: 8px;
-  background: var(--ui-fill-color-blank);
+  background: var(--ui-fill-color-light);
   padding: 12px 14px;
 }
 
 .message--user {
   align-self: flex-end;
-  border-color: var(--ui-color-primary-light-7);
   background: var(--ui-color-primary-light-9);
 }
 

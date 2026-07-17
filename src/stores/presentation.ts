@@ -54,6 +54,7 @@ export const usePresentationStore = defineStore('presentation', () => {
 
   const latestWorkspaceVersion = computed(() =>
     agentStore.workspaceFiles
+      .filter((file) => !normalizePath(file.path).startsWith('.tmp/'))
       .map((file) => file.updatedAt)
       .reduce((latest, updatedAt) => Math.max(latest, updatedAt), 0)
       .toString(),

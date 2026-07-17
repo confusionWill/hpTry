@@ -25,7 +25,7 @@
         :min-rows="2"
         :max-rows="6"
         :placeholder="t('conversation.inputPlaceholder')"
-        @keydown.enter.exact.prevent="send"
+        @keydown="handleComposerKeydown"
       />
       <div v-if="currentProjectAssets.length > 0" class="agent-composer__assets">
         <article v-for="asset in currentProjectAssets" :key="asset.path" class="uploaded-asset">
@@ -79,7 +79,7 @@
 
 <script setup lang="ts">
 import { Paperclip, Send, Square, X } from '@lucide/vue'
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
@@ -435,6 +435,36 @@ async function send() {
     const message = error instanceof Error ? error.message : t('provider.requestFailed')
     uiStore.showToast(message || t('provider.requestFailed'), 'error')
   }
+}
+
+function handleComposerKeydown(event: KeyboardEvent) {
+  const isEnter =
+    event.key === 'Enter' || event.key === 'NumpadEnter' || event.code === 'NumpadEnter'
+
+  if (!isEnter || event.isComposing) {
+    return
+  }
+
+  if (event.shiftKey) {
+    event.preventDefault()
+    insertComposerLineBreak(event)
+    return
+  }
+
+  event.preventDefault()
+  void send()
+}
+
+function insertComposerLineBreak(event: KeyboardEvent) {
+  const textarea = event.target as HTMLTextAreaElement
+  const selectionStart = textarea.selectionStart ?? draft.value.length
+  const selectionEnd = textarea.selectionEnd ?? selectionStart
+  const nextCursorPosition = selectionStart + 1
+
+  draft.value = `${draft.value.slice(0, selectionStart)}\n${draft.value.slice(selectionEnd)}`
+  void nextTick(() => {
+    textarea.setSelectionRange(nextCursorPosition, nextCursorPosition)
+  })
 }
 
 function handleComposerAction() {
