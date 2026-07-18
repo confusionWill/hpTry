@@ -14,7 +14,7 @@
     <template v-else>
       <section class="workspace__preview">
         <LivePreviewPanel />
-        <AgentComposer ref="composerRef" />
+        <AgentComposer ref="composerRef" class="workspace__composer" />
       </section>
 
       <ChatPanel
@@ -68,7 +68,7 @@ watch(
 <style scoped>
 .workspace {
   display: grid;
-  grid-template-columns: 320px minmax(320px, 1fr) minmax(240px, 23vw);
+  grid-template-columns: 280px minmax(320px, 1fr) minmax(220px, 20vw);
   width: 100%;
   height: 100%;
   overflow: hidden;
@@ -80,7 +80,7 @@ watch(
 }
 
 .workspace--chat-collapsed {
-  grid-template-columns: 320px minmax(320px, 1fr) 64px;
+  grid-template-columns: 280px minmax(320px, 1fr) 64px;
 }
 
 .workspace__left {
@@ -88,7 +88,6 @@ watch(
   display: grid;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--ui-border-color-light);
   background: var(--ui-bg-color);
   grid-template-rows: minmax(0, 1fr);
 }
@@ -97,10 +96,14 @@ watch(
   display: grid;
   min-width: 0;
   min-height: 0;
-  border-right: 1px solid var(--ui-border-color-light);
-  background: var(--ui-bg-color);
-  grid-template-rows: minmax(0, 1fr) auto;
+  background: transparent;
+  grid-template-rows: minmax(0, 1fr) 80px;
   view-transition-name: workspace-preview;
+}
+
+.workspace__composer {
+  z-index: 1;
+  align-self: end;
 }
 
 .project-empty {
@@ -118,12 +121,12 @@ watch(
 
 @media (max-width: 1100px) {
   .workspace {
-    grid-template-columns: 320px 420px 240px;
+    grid-template-columns: 280px 420px 220px;
     overflow: auto;
   }
 
   .workspace--chat-collapsed {
-    grid-template-columns: 320px 420px 64px;
+    grid-template-columns: 280px 420px 64px;
   }
 }
 

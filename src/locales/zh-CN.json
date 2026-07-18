@@ -36,7 +36,7 @@
       "collapse": "收起对话面板",
       "expand": "展开对话面板"
     },
-    "inputPlaceholder": "输入消息，按 Enter 发送，Shift + Enter 换行",
+    "inputAriaLabel": "消息输入框",
     "send": "发送",
     "sending": "发送中",
     "stop": "停止",
@@ -131,7 +131,6 @@
     "exportFailed": "导出失败",
     "livePreview": {
       "title": "实时预览",
-      "noEntry": "等待 hp.html",
       "aspectRatio": "比例",
       "aspectRatioNone": "无",
       "enterFullscreen": "全屏预览",

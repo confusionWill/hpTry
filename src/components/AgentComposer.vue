@@ -16,69 +16,73 @@
       :aria-label="t('conversation.upload.selectFiles')"
       @change="handleFileInputChange"
     />
-    <div class="agent-composer__main">
-      <UiTextarea
-        ref="textareaRef"
-        v-model="draft"
-        autosize
-        :disabled="isUploadingFiles"
-        :min-rows="2"
-        :max-rows="6"
-        :placeholder="t('conversation.inputPlaceholder')"
-        @keydown="handleComposerKeydown"
-      />
-      <div v-if="currentProjectAssets.length > 0" class="agent-composer__assets">
-        <article v-for="asset in currentProjectAssets" :key="asset.path" class="uploaded-asset">
-          <span class="uploaded-asset__name">{{ fileNameForPath(asset.path) }}</span>
-          <span class="uploaded-asset__path">{{ asset.path }}</span>
-          <UiButton
-            circle
-            text
-            class="uploaded-asset__remove"
-            :aria-label="t('conversation.upload.removeFile', { name: fileNameForPath(asset.path) })"
-            :disabled="isUploadingFiles"
-            @click="removeUploadedAsset(asset)"
-          >
-            <template #icon>
-              <X :size="14" />
-            </template>
-          </UiButton>
-        </article>
-      </div>
-    </div>
-    <UiButton
-      circle
-      :disabled="currentProjectRunning || isUploadingFiles"
-      :aria-label="t('conversation.upload.selectFiles')"
-      @click="openFilePicker"
-    >
-      <template #icon>
-        <Paperclip :size="16" />
-      </template>
-    </UiButton>
-    <UiButton
-      :danger="currentProjectRunning"
-      :disabled="composerActionDisabled"
-      :loading="isUploadingFiles"
-      variant="primary"
-      @click="handleComposerAction"
-    >
-      <template #icon>
-        <Square
-          v-if="currentProjectRunning"
-          class="agent-composer__stop-icon"
-          :class="{ 'agent-composer__stop-icon--stopping': currentProjectStopping }"
-          :size="14"
+    <div class="agent-composer__controls">
+      <UiButton
+        circle
+        :disabled="currentProjectRunning || isUploadingFiles"
+        :aria-label="t('conversation.upload.selectFiles')"
+        @click="openFilePicker"
+      >
+        <template #icon>
+          <Paperclip :size="16" />
+        </template>
+      </UiButton>
+      <div class="agent-composer__main">
+        <UiTextarea
+          ref="textareaRef"
+          v-model="draft"
+          autosize
+          class="agent-composer__input"
+          :aria-label="t('conversation.inputAriaLabel')"
+          :disabled="isUploadingFiles"
+          :min-rows="2"
+          :max-rows="6"
+          @keydown="handleComposerKeydown"
         />
-        <Send v-else :size="16" />
-      </template>
-      {{ composerActionLabel }}
-    </UiButton>
+        <div v-if="currentProjectAssets.length > 0" class="agent-composer__assets">
+          <article v-for="asset in currentProjectAssets" :key="asset.path" class="uploaded-asset">
+            <span class="uploaded-asset__name">{{ fileNameForPath(asset.path) }}</span>
+            <span class="uploaded-asset__path">{{ asset.path }}</span>
+            <UiButton
+              circle
+              text
+              class="uploaded-asset__remove"
+              :aria-label="t('conversation.upload.removeFile', { name: fileNameForPath(asset.path) })"
+              :disabled="isUploadingFiles"
+              @click="removeUploadedAsset(asset)"
+            >
+              <template #icon>
+                <X :size="14" />
+              </template>
+            </UiButton>
+          </article>
+        </div>
+      </div>
+      <UiButton
+        circle
+        :danger="currentProjectRunning"
+        :disabled="composerActionDisabled"
+        :loading="isUploadingFiles"
+        variant="primary"
+        :aria-label="composerActionLabel"
+        @click="handleComposerAction"
+      >
+        <template #icon>
+          <Square
+            v-if="currentProjectRunning"
+            class="agent-composer__stop-icon"
+            :class="{ 'agent-composer__stop-icon--stopping': currentProjectStopping }"
+            :size="14"
+          />
+          <ArrowUp v-else :size="17" :stroke-width="2.4" />
+        </template>
+      </UiButton>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { Paperclip, Send, Square, X } from '@lucide/vue'
+import { ArrowUp, Paperclip, Square, X } from '@lucide/vue'
 import { computed, nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -483,16 +487,19 @@ function handleComposerAction() {
 
 <style scoped>
 .agent-composer {
-  display: grid;
-  align-items: end;
-  gap: 10px;
-  border-top: 1px solid var(--ui-border-color-light);
-  background: var(--ui-bg-color);
-  grid-template-columns: minmax(0, 1fr) auto auto;
   padding: 14px 18px;
   transition:
     background-color 0.15s ease,
     box-shadow 0.15s ease;
+}
+
+.agent-composer__controls {
+  display: grid;
+  width: min(100%, 820px);
+  align-items: end;
+  gap: 10px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  margin: 0 auto;
 }
 
 .agent-composer--dragging {
@@ -514,6 +521,21 @@ function handleComposerAction() {
   display: grid;
   min-width: 0;
   gap: 8px;
+  border-radius: 10px 10px 0 0;
+  background: #fffefb;
+  margin-bottom: -14px;
+  box-shadow: 0 1px 5px rgb(15 23 42 / 12%);
+}
+
+:deep(.ui-textarea.agent-composer__input) {
+  border: 0;
+  background: transparent;
+  color: #4e4e4e;
+  font-weight: 400;
+}
+
+:deep(.ui-textarea.agent-composer__input:focus) {
+  border-color: transparent;
 }
 
 .agent-composer__assets {

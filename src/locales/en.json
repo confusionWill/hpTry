@@ -36,7 +36,7 @@
       "collapse": "Collapse conversation panel",
       "expand": "Expand conversation panel"
     },
-    "inputPlaceholder": "Type a message, Enter to send, Shift + Enter for newline",
+    "inputAriaLabel": "Message input",
     "send": "Send",
     "sending": "Sending",
     "stop": "Stop",
@@ -131,7 +131,6 @@
     "exportFailed": "Export failed",
     "livePreview": {
       "title": "Live preview",
-      "noEntry": "Waiting for hp.html",
       "aspectRatio": "Ratio",
       "aspectRatioNone": "None",
       "enterFullscreen": "Preview fullscreen",

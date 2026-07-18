@@ -22,7 +22,7 @@
         @click="filesExpanded = !filesExpanded"
       >
         <span class="workspace-panel__section-name">
-          <ChevronDown v-if="filesExpanded" :size="14" />
+          <ChevronUp v-if="filesExpanded" :size="14" />
           <ChevronRight v-else :size="14" />
           <span>{{ t('workspace.files') }}</span>
         </span>
@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronDown, ChevronRight } from '@lucide/vue'
+import { ChevronRight, ChevronUp } from '@lucide/vue'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 

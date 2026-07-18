@@ -1,17 +1,10 @@
 <template>
   <section class="chat-panel" :class="{ 'chat-panel--collapsed': collapsed }">
     <div class="chat-panel__header">
-      <div v-if="!collapsed">
-        <h1>{{ conversationTitle }}</h1>
-        <p v-if="store.selectedProject">
-          {{ store.selectedProject.name }}
-        </p>
-      </div>
       <UiButton
         :aria-label="
           collapsed ? t('conversation.panel.expand') : t('conversation.panel.collapse')
         "
-        circle
         text
         class="chat-panel__collapse"
         :disabled="isTransitioning"
@@ -56,22 +49,22 @@
                 class="message-row message-row--user"
               >
                 <article class="message" :class="`message--${bubble.message.role}`">
+                  <span
+                    class="message-avatar message-avatar--user message-avatar--in-bubble"
+                    :style="avatarTransitionStyle(bubble.id)"
+                    aria-hidden="true"
+                  />
                   <MarkdownPreview :content="bubble.message.content" />
                 </article>
-                <span
-                  class="message-avatar message-avatar--user"
-                  :style="avatarTransitionStyle(bubble.id)"
-                  aria-hidden="true"
-                />
               </div>
 
               <div v-else class="message-row message-row--assistant">
-                <span
-                  class="message-avatar message-avatar--assistant"
-                  :style="avatarTransitionStyle(bubble.id)"
-                  aria-hidden="true"
-                />
                 <article class="message message--assistant">
+                  <span
+                    class="message-avatar message-avatar--assistant message-avatar--in-bubble"
+                    :style="avatarTransitionStyle(bubble.id)"
+                    aria-hidden="true"
+                  />
                   <details
                     v-if="bubble.tools.length > 0"
                     class="message__tools"
@@ -223,17 +216,6 @@ const collapsedConversationBubbles = computed(() => conversationBubbles.value.sl
 const transitioningBubbleIds = computed(
   () => new Set(collapsedConversationBubbles.value.map((bubble) => bubble.id)),
 )
-const conversationTitle = computed(() => {
-  if (store.selectedConversation) {
-    return store.selectedConversation.title
-  }
-
-  if (store.isDraftConversationActive) {
-    return t('conversation.new')
-  }
-
-  return t('conversation.selectEmpty')
-})
 const latestEvent = computed(() => store.events.at(-1))
 const selectedTool = computed(() => {
   const event = store.events.find((item) => item.id === selectedToolId.value)
@@ -575,40 +557,33 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   flex: 1;
   flex-direction: column;
   background: var(--ui-bg-color);
-  view-transition-name: chat-panel-shell;
 }
 
 .chat-panel__header {
   display: flex;
-  min-height: 70px;
+  min-height: 64px;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  border-bottom: 1px solid var(--ui-border-color-light);
-  padding: 14px 18px;
-}
-
-.chat-panel__header h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 650;
-}
-
-.chat-panel__header p {
-  margin: 4px 0 0;
-  color: var(--ui-text-color-secondary);
-  font-size: 13px;
+  justify-content: flex-end;
+  padding: 11px 12px;
 }
 
 .chat-panel__collapse {
+  width: 34px;
+  min-width: 34px;
+  height: 34px;
+  min-height: 34px;
   flex: 0 0 auto;
-  color: var(--ui-text-color-secondary);
-  view-transition-name: chat-panel-toggle;
+  border-color: #374151;
+  border-radius: 0;
+  background: #374151;
+  color: var(--ui-color-white);
+  padding: 0;
 }
 
-.chat-panel--collapsed .chat-panel__header {
-  justify-content: center;
-  padding-inline: 8px;
+.chat-panel__collapse:hover:not(:disabled) {
+  border-color: #1f2937;
+  background: #1f2937;
+  color: var(--ui-color-white);
 }
 
 .chat-panel__avatar-list {
@@ -627,6 +602,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 .chat-panel__body,
 .empty-state {
   animation: chat-panel-content-enter 260ms ease-out both;
+  view-transition-name: chat-panel-shell;
 }
 
 .empty-state {
@@ -641,6 +617,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   min-width: 0;
   min-height: 0;
   flex: 1;
+  overflow: hidden;
 }
 
 .chat-panel__conversation {
@@ -699,6 +676,22 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   background: #22c55e;
 }
 
+.message-avatar--in-bubble {
+  position: absolute;
+  z-index: 1;
+  top: -8px;
+  width: 20px;
+  height: 20px;
+}
+
+.message--assistant .message-avatar--in-bubble {
+  left: -8px;
+}
+
+.message--user .message-avatar--in-bubble {
+  right: -8px;
+}
+
 @keyframes chat-panel-content-enter {
   from {
     opacity: 0;
@@ -714,6 +707,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 }
 
 .message {
+  position: relative;
   max-width: min(760px, 86%);
   border-radius: 8px;
   background: var(--ui-fill-color-light);

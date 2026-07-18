@@ -74,6 +74,30 @@ function thumbnailUrl(page: number): string {
   overflow: auto;
   overscroll-behavior: contain;
   background: var(--ui-bg-color);
+  scrollbar-color: transparent transparent;
+}
+
+.slide-sidebar::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+
+.slide-sidebar:hover {
+  scrollbar-color: var(--ui-scrollbar-thumb) transparent;
+}
+
+.slide-sidebar:hover::-webkit-scrollbar-thumb {
+  background: var(--ui-scrollbar-thumb);
+}
+
+.slide-sidebar:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--ui-scrollbar-thumb-hover);
+}
+
+@supports selector(::-webkit-scrollbar) {
+  .slide-sidebar,
+  .slide-sidebar:hover {
+    scrollbar-color: auto;
+  }
 }
 
 .slide-sidebar__list {

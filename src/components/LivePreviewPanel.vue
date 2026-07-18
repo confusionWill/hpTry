@@ -1,11 +1,6 @@
 <template>
   <section class="live-preview">
     <header class="live-preview__header">
-      <div>
-        <h2>{{ t('workspace.livePreview.title') }}</h2>
-        <p>{{ previewPathLabel }}</p>
-      </div>
-
       <div class="live-preview__actions">
         <PreviewAspectRatioSelect v-model="selectedAspectRatio" />
         <UiButton
@@ -109,9 +104,6 @@ const previewViewportStyle = computed<Partial<Record<string, string>>>(() => {
 })
 
 const indexFile = computed(() => presentationStore.indexFile)
-const previewPathLabel = computed(
-  () => presentationStore.indexFile?.path ?? t('workspace.livePreview.noEntry'),
-)
 
 onMounted(async () => {
   previewWorkerReady.value = await registerPreviewWorker()
@@ -247,32 +239,16 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   min-width: 0;
   min-height: 0;
   flex-direction: column;
-  background: var(--ui-bg-color);
+  background: transparent;
 }
 
 .live-preview__header {
   display: flex;
-  min-height: 70px;
+  min-height: 48px;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
-  border-bottom: 1px solid var(--ui-border-color-light);
-  padding: 14px 18px;
-}
-
-.live-preview__header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.live-preview__header p {
-  margin: 4px 0 0;
-  overflow: hidden;
-  color: var(--ui-text-color-secondary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  padding: 7px 12px;
 }
 
 .live-preview__actions {
@@ -287,7 +263,7 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   min-width: 0;
   min-height: 0;
   flex: 1;
-  background: var(--ui-fill-color-light);
+  background: transparent;
   container-type: size;
   place-items: center;
 }
@@ -307,7 +283,6 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   width: 100%;
   height: 100%;
   background: #ffffff;
-  box-shadow: 0 0 0 1px var(--ui-border-color-light);
 }
 
 .live-preview__viewport--fixed {
@@ -318,22 +293,11 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
 }
 
 .live-preview__frame {
+  display: block;
   width: 100%;
   height: 100%;
   border: 0;
   background: #ffffff;
 }
 
-@media (max-width: 980px) {
-  .live-preview__header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .live-preview__actions {
-    width: 100%;
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
 </style>

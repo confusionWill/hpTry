@@ -266,7 +266,6 @@ async function confirmDeleteConversation(conversationId: string) {
   height: 100%;
   flex-direction: column;
   gap: 16px;
-  overflow: hidden;
   background: var(--ui-bg-color);
   padding: 16px;
 }
