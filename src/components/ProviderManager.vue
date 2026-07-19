@@ -85,7 +85,7 @@
         {{ t('common.cancel') }}
       </UiButton>
       <UiButton :disabled="!canSave || testingProvider" variant="primary" @click="saveProvider">
-        {{ editingProviderId ? t('common.save') : t('provider.add') }}
+        {{ t('common.save') }}
       </UiButton>
     </template>
   </UiDialog>
@@ -207,6 +207,7 @@ async function testProvider() {
           content: 'ok',
         },
       ],
+      thinking: false,
       timeoutMs: 15_000,
     })
     uiStore.showToast(t('provider.testSuccess'), 'success')

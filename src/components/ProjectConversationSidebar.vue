@@ -41,15 +41,18 @@
     />
 
     <div class="section conversations">
-      <div class="section__header">
-        <h2>{{ t('conversation.title') }}</h2>
+      <div class="conversation-actions">
         <UiButton
+          :aria-label="t('conversation.new')"
+          class="new-conversation-button"
           :disabled="!store.selectedProjectId"
-          circle
           @click="store.startDraftConversation()"
         >
           <template #icon>
-            <MessageCircle :size="17" />
+            <span class="new-conversation-button__icons">
+              <MessageCircle :size="17" />
+              <Plus :size="16" />
+            </span>
           </template>
         </UiButton>
       </div>
@@ -266,7 +269,6 @@ async function confirmDeleteConversation(conversationId: string) {
   height: 100%;
   flex-direction: column;
   gap: 16px;
-  background: var(--ui-bg-color);
   padding: 16px;
 }
 
@@ -282,12 +284,6 @@ async function confirmDeleteConversation(conversationId: string) {
   justify-content: space-between;
 }
 
-.section__header h2 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
 .provider-entry {
   min-width: 0;
 }
@@ -301,6 +297,23 @@ async function confirmDeleteConversation(conversationId: string) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.conversation-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.new-conversation-button {
+  min-width: 72px;
+  border-radius: 999px;
+  padding-inline: 18px;
+}
+
+.new-conversation-button__icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .conversations {

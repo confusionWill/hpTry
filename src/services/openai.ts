@@ -51,6 +51,7 @@ interface ChatCompletionChunk {
 
 interface ChatCompletionChoice {
   message?: ChatCompletionMessage
+  finish_reason?: string | null
 }
 
 interface ChatCompletionResponse {
@@ -76,6 +77,10 @@ export type ChatCompletionResponseErrorCode =
   | 'emptyResponse'
   | 'invalidStreamResponse'
   | 'invalidStreamingToolCall'
+  | 'outputTruncated'
+  | 'contentFiltered'
+  | 'insufficientSystemResource'
+  | 'unexpectedFinishReason'
   | 'streamEndedUnexpectedly'
   | 'streamFailed'
 
@@ -86,6 +91,10 @@ export const CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS: Record<
   emptyResponse: 'provider.responseError.emptyResponse',
   invalidStreamResponse: 'provider.responseError.invalidStreamResponse',
   invalidStreamingToolCall: 'provider.responseError.invalidStreamingToolCall',
+  outputTruncated: 'provider.responseError.outputTruncated',
+  contentFiltered: 'provider.responseError.contentFiltered',
+  insufficientSystemResource: 'provider.responseError.insufficientSystemResource',
+  unexpectedFinishReason: 'provider.responseError.unexpectedFinishReason',
   streamEndedUnexpectedly: 'provider.responseError.streamEndedUnexpectedly',
   streamFailed: 'provider.responseError.streamFailed',
 }
@@ -98,6 +107,26 @@ export class ChatCompletionResponseError extends Error {
     this.name = 'ChatCompletionResponseError'
     this.code = code
   }
+}
+
+function validateFinishReason(finishReason?: string | null): void {
+  if (!finishReason || finishReason === 'stop' || finishReason === 'tool_calls') {
+    return
+  }
+
+  if (finishReason === 'length') {
+    throw new ChatCompletionResponseError('outputTruncated')
+  }
+
+  if (finishReason === 'content_filter') {
+    throw new ChatCompletionResponseError('contentFiltered')
+  }
+
+  if (finishReason === 'insufficient_system_resource') {
+    throw new ChatCompletionResponseError('insufficientSystemResource')
+  }
+
+  throw new ChatCompletionResponseError('unexpectedFinishReason')
 }
 
 function normalizeBaseUrl(baseUrl: string): string {
@@ -158,6 +187,7 @@ async function readChatCompletionStream(
   let reasoningContent = ''
   let done = false
   let streamCompleted = false
+  let finishReason: string | null | undefined
 
   const processEvent = () => {
     if (dataLines.length === 0 || done) {
@@ -193,6 +223,7 @@ async function readChatCompletionStream(
     const choice = chunk.choices?.[0]
 
     if (choice?.finish_reason) {
+      finishReason = choice.finish_reason
       streamCompleted = true
     }
 
@@ -273,6 +304,8 @@ async function readChatCompletionStream(
     }
   }
 
+  validateFinishReason(finishReason)
+
   const toolCalls = [...toolCallDeltas.entries()]
     .sort(([left], [right]) => left - right)
     .map(([, toolCall]) => {
@@ -306,6 +339,7 @@ export async function requestChatCompletion(params: {
   tools?: ChatTool[]
   signal?: AbortSignal
   timeoutMs?: number
+  thinking?: boolean
   onTextDelta?: (delta: string, content: string) => void
 }): Promise<ChatCompletionResult> {
   const controller = new AbortController()
@@ -325,6 +359,25 @@ export async function requestChatCompletion(params: {
   params.signal?.addEventListener('abort', abortRequest, { once: true })
 
   let response: Response
+  const thinkingEnabled = params.thinking ?? true
+  const body: {
+    model: string
+    messages: ChatMessageParam[]
+    tools?: ChatTool[]
+    stream: true
+    thinking: { type: 'enabled' | 'disabled' }
+    reasoning_effort?: 'high'
+  } = {
+    model: params.provider.model,
+    messages: params.messages,
+    tools: params.tools,
+    stream: true,
+    thinking: { type: thinkingEnabled ? 'enabled' : 'disabled' },
+  }
+
+  if (thinkingEnabled) {
+    body.reasoning_effort = 'high'
+  }
 
   try {
     response = await fetch(`${normalizeBaseUrl(params.provider.baseUrl)}/chat/completions`, {
@@ -334,12 +387,7 @@ export async function requestChatCompletion(params: {
         'Content-Type': 'application/json',
       },
       signal: controller.signal,
-      body: JSON.stringify({
-        model: params.provider.model,
-        messages: params.messages,
-        tools: params.tools,
-        stream: true,
-      }),
+      body: JSON.stringify(body),
     })
   } catch (error) {
     window.clearTimeout(timeoutId)
@@ -367,7 +415,8 @@ export async function requestChatCompletion(params: {
     }
 
     const payload = (await response.json()) as ChatCompletionResponse
-    const message = payload.choices?.[0]?.message
+    const choice = payload.choices?.[0]
+    const message = choice?.message
 
     if (!message) {
       if (payload.error?.message) {
@@ -376,6 +425,8 @@ export async function requestChatCompletion(params: {
 
       throw new ChatCompletionResponseError('emptyResponse')
     }
+
+    validateFinishReason(choice?.finish_reason)
 
     if (message.content) {
       params.onTextDelta?.(message.content, message.content)

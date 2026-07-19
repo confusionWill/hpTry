@@ -60,11 +60,19 @@
 
               <div v-else class="message-row message-row--assistant">
                 <article class="message message--assistant">
-                  <span
-                    class="message-avatar message-avatar--assistant message-avatar--in-bubble"
-                    :style="avatarTransitionStyle(bubble.id)"
-                    aria-hidden="true"
-                  />
+                  <div class="message__assistant-meta">
+                    <span
+                      class="message-avatar message-avatar--assistant message-avatar--assistant-meta"
+                      :style="avatarTransitionStyle(bubble.id)"
+                      aria-hidden="true"
+                    />
+                    <span
+                      v-if="bubble.message?.responseDurationMs !== undefined"
+                      class="message__answer-duration"
+                    >
+                      {{ formatAnswerDuration(bubble.message.responseDurationMs) }}
+                    </span>
+                  </div>
                   <details
                     v-if="bubble.tools.length > 0"
                     class="message__tools"
@@ -75,24 +83,29 @@
                       <span>{{ summarizeToolGroup(bubble.tools) }}</span>
                     </summary>
                     <div class="message__tools-list">
-                      <button
-                        v-for="tool in bubble.tools"
-                        :key="tool.id"
-                        class="tool-event"
-                        :class="`tool-event--${tool.status}`"
-                        type="button"
-                        @click="openToolDetail(tool)"
-                      >
-                        <span class="tool-event__name">
-                          {{ t('conversation.toolCall', { name: tool.toolName }) }}
-                        </span>
-                        <span class="tool-event__summary">
-                          {{ summarizeToolEvent(tool) }}
-                        </span>
-                        <span class="tool-event__status">
-                          {{ t(`workspace.toolStatus.${tool.status}`) }}
-                        </span>
-                      </button>
+                      <template v-for="tool in bubble.tools" :key="tool.id">
+                        <button
+                          class="tool-event"
+                          :class="`tool-event--${tool.status}`"
+                          type="button"
+                          @click="openToolDetail(tool)"
+                        >
+                          <span class="tool-event__name">
+                            {{ t('conversation.toolCall', { name: tool.toolName }) }}
+                          </span>
+                          <span class="tool-event__summary">
+                            {{ summarizeToolEvent(tool) }}
+                          </span>
+                          <span class="tool-event__status">
+                            {{ t(`workspace.toolStatus.${tool.status}`) }}
+                          </span>
+                        </button>
+                        <MarkdownPreview
+                          v-if="tool.assistantContent"
+                          class="tool-event__content"
+                          :content="tool.assistantContent"
+                        />
+                      </template>
                     </div>
                   </details>
 
@@ -101,16 +114,6 @@
                       :content="bubble.message.content"
                       :streaming="isStreamingAssistantMessage(bubble.message)"
                     />
-                    <span
-                      v-if="bubble.message.responseDurationMs !== undefined"
-                      class="message__answer-duration"
-                    >
-                      {{
-                        t('conversation.answerDuration', {
-                          duration: formatAnswerDuration(bubble.message.responseDurationMs),
-                        })
-                      }}
-                    </span>
                   </template>
                 </article>
               </div>
@@ -556,15 +559,15 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  background: var(--ui-bg-color);
+  background: #fff;
 }
 
 .chat-panel__header {
   display: flex;
-  min-height: 64px;
+  min-height: 48px;
   align-items: center;
   justify-content: flex-end;
-  padding: 11px 12px;
+  padding: 0 12px;
 }
 
 .chat-panel__collapse {
@@ -636,7 +639,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   gap: 12px;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 18px;
+  padding: 18px 18px 40px;
 }
 
 .messages__history-status {
@@ -676,6 +679,12 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   background: #22c55e;
 }
 
+.message-avatar--assistant-meta {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+
 .message-avatar--in-bubble {
   position: absolute;
   z-index: 1;
@@ -684,8 +693,13 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   height: 20px;
 }
 
-.message--assistant .message-avatar--in-bubble {
-  left: -8px;
+.message--assistant {
+  max-width: min(760px, 100%);
+  padding: 5px 0 !important;
+}
+
+.message--user {
+  max-width: min(760px, 90%);
 }
 
 .message--user .message-avatar--in-bubble {
@@ -708,15 +722,20 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
 
 .message {
   position: relative;
-  max-width: min(760px, 86%);
   border-radius: 8px;
-  background: var(--ui-fill-color-light);
-  padding: 12px 14px;
+  padding: 10px 12px;
 }
 
 .message--user {
   align-self: flex-end;
   background: var(--ui-color-primary-light-9);
+}
+
+.message__assistant-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .message__tools {
@@ -762,9 +781,11 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   padding: 10px;
 }
 
+.tool-event__content {
+  padding: 0 4px 4px;
+}
+
 .message__answer-duration {
-  display: block;
-  margin-top: 8px;
   color: var(--ui-text-color-secondary);
   font-size: 12px;
   line-height: 1.4;

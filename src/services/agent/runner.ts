@@ -29,6 +29,7 @@ export interface AgentRunHandlers {
     toolCall: ToolCall,
     stepSequence: number,
     reasoningContent?: string,
+    assistantContent?: string,
   ) => Promise<ToolRun>
   updateToolRun: (
     run: ToolRun,
@@ -93,9 +94,11 @@ function toChatMessages(systemPrompt: string, events: ConversationEvent[]): Chat
       continue
     }
 
+    const assistantEvent = toolStep.find((tool) => tool.assistantContent !== undefined)
+
     messages.push({
       role: 'assistant',
-      content: null,
+      content: assistantEvent?.assistantContent ?? null,
       reasoning_content: toolStep.find((tool) => tool.reasoningContent)?.reasoningContent,
       tool_calls: toolStep.map((tool) => ({
         id: tool.toolCallId,
@@ -141,12 +144,18 @@ async function executeToolCall(
   toolCall: ToolCall,
   stepSequence: number,
   reasoningContent: string | undefined,
+  assistantContent: string | undefined,
   runContext: AgentRunContext,
   handlers: AgentRunHandlers,
   signal?: AbortSignal,
 ): Promise<ChatMessageParam> {
   throwIfAborted(signal)
-  const run = await handlers.createToolRun(toolCall, stepSequence, reasoningContent)
+  const run = await handlers.createToolRun(
+    toolCall,
+    stepSequence,
+    reasoningContent,
+    assistantContent,
+  )
 
   try {
     throwIfAborted(signal)
@@ -219,6 +228,7 @@ export async function runAgentConversation(params: {
       provider: params.runContext.provider,
       messages: agentMessages,
       tools: hpTryTools,
+      thinking: true,
       signal: params.signal,
       onTextDelta: (_delta, content) => params.onAssistantStream?.(content, stepSequence),
     })
@@ -246,6 +256,7 @@ export async function runAgentConversation(params: {
         toolCall,
         stepSequence,
         toolCallIndex === 0 ? (response.message.reasoning_content ?? undefined) : undefined,
+        toolCallIndex === 0 ? (response.message.content ?? undefined) : undefined,
         params.runContext,
         params.handlers,
         params.signal,
@@ -269,6 +280,7 @@ export async function generateConversationTitle(params: {
 }): Promise<string> {
   const response = await requestChatCompletion({
     provider: params.provider,
+    thinking: false,
     messages: [
       {
         role: 'system',

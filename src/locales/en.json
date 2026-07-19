@@ -52,7 +52,6 @@
       "missingProject": "Select a project first.",
       "messageHeading": ".tmp assets:"
     },
-    "answerDuration": "Answered in {duration}",
     "toolCall": "Tool call: {name}",
     "toolGroup": "{count} tool calls",
     "toolGroupRunning": "{count} running",
@@ -112,6 +111,10 @@
       "emptyResponse": "The provider returned an empty response.",
       "invalidStreamResponse": "The provider returned an invalid streaming response.",
       "invalidStreamingToolCall": "The provider returned an invalid tool call.",
+      "outputTruncated": "The model output was truncated by the length limit.",
+      "contentFiltered": "The model response was blocked by content filtering.",
+      "insufficientSystemResource": "The provider has insufficient inference resources. Try again later.",
+      "unexpectedFinishReason": "The provider returned an unknown response finish state.",
       "streamEndedUnexpectedly": "The streaming response ended unexpectedly. Try again.",
       "streamFailed": "The streaming response failed. Try again."
     },

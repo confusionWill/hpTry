@@ -283,6 +283,7 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   width: 100%;
   height: 100%;
   background: #ffffff;
+  /* box-shadow: 0 0 10px #eee; */
 }
 
 .live-preview__viewport--fixed {

@@ -690,6 +690,7 @@ export const useAgentStore = defineStore('agent', {
       events: ConversationEvent[],
       toolCall: ToolCall,
       reasoningContent?: string,
+      assistantContent?: string,
     ): Promise<ToolRun> {
       const timestamp = now()
       const run: ToolRun = {
@@ -701,6 +702,7 @@ export const useAgentStore = defineStore('agent', {
         type: 'tool',
         toolCallId: toolCall.id,
         toolName: toolCall.function.name,
+        assistantContent,
         reasoningContent,
         status: 'running',
         input: toolCall.function.arguments,
@@ -930,7 +932,7 @@ export const useAgentStore = defineStore('agent', {
           runContext,
           signal: abortController.signal,
           handlers: {
-            createToolRun: (toolCall, stepSequence, reasoningContent) => {
+            createToolRun: (toolCall, stepSequence, reasoningContent, assistantContent) => {
               const sequence = eventSequence
               eventSequence += 1
 
@@ -942,6 +944,7 @@ export const useAgentStore = defineStore('agent', {
                 runContext.events,
                 toolCall,
                 reasoningContent,
+                assistantContent,
               )
             },
             updateToolRun: (run, patch) => this.updateToolRun(runContext.events, run, patch),

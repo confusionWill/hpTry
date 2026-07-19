@@ -52,7 +52,6 @@
       "missingProject": "请先选择项目。",
       "messageHeading": "临时资源："
     },
-    "answerDuration": "回答耗时：{duration}",
     "toolCall": "工具调用：{name}",
     "toolGroup": "工具调用 {count} 次",
     "toolGroupRunning": "{count} 个运行中",
@@ -112,6 +111,10 @@
       "emptyResponse": "供应商返回了空响应。",
       "invalidStreamResponse": "供应商返回了无效的流式响应。",
       "invalidStreamingToolCall": "供应商返回了无效的工具调用。",
+      "outputTruncated": "模型输出因长度限制被截断。",
+      "contentFiltered": "模型响应被内容安全策略过滤。",
+      "insufficientSystemResource": "供应商推理资源不足，请稍后重试。",
+      "unexpectedFinishReason": "供应商返回了未知的响应结束状态。",
       "streamEndedUnexpectedly": "流式响应意外中断，请重试。",
       "streamFailed": "流式响应失败，请重试。"
     },

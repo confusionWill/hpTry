@@ -73,7 +73,6 @@ function thumbnailUrl(page: number): string {
   flex: 1;
   overflow: auto;
   overscroll-behavior: contain;
-  background: var(--ui-bg-color);
   scrollbar-color: transparent transparent;
 }
 

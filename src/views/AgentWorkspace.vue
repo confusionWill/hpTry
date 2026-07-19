@@ -88,8 +88,8 @@ watch(
   display: grid;
   min-width: 0;
   min-height: 0;
-  background: var(--ui-bg-color);
   grid-template-rows: minmax(0, 1fr);
+  background: #fff;
 }
 
 .workspace__preview {

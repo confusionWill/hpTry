@@ -70,7 +70,7 @@ watch(
 <style scoped>
 .ui-textarea {
   width: 100%;
-  min-height: 72px;
+  min-height: 68px;
   border: 1px solid var(--ui-border-color);
   border-radius: 7px;
   background: var(--ui-bg-color);

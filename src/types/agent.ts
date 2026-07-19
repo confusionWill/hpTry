@@ -95,6 +95,7 @@ export interface ConversationToolEvent extends BaseConversationEvent {
   type: 'tool'
   toolCallId: string
   toolName: string
+  assistantContent?: string
   reasoningContent?: string
   status: ToolRunStatus
   input: string
