@@ -1,9 +1,21 @@
 import type { Project, ToolCall, WorkspaceFile } from '@/types/agent'
 
+export type AgentToolName =
+  | 'list_files'
+  | 'search_files'
+  | 'read_files'
+  | 'write_file'
+  | 'edit_file'
+  | 'replace_in_file'
+  | 'delete_file'
+  | 'rename_file'
+  | 'delete_directory'
+  | 'rename_directory'
+
 export interface ChatTool {
   type: 'function'
   function: {
-    name: string
+    name: AgentToolName
     description: string
     parameters: {
       type: 'object'

@@ -72,42 +72,57 @@
                     >
                       {{ formatAnswerDuration(bubble.message.responseDurationMs) }}
                     </span>
-                  </div>
-                  <details
-                    v-if="bubble.tools.length > 0"
-                    class="message__tools"
-                    :open="hasRunningTool(bubble.tools)"
-                  >
-                    <summary class="message__tools-summary">
-                      <span>{{ t('conversation.toolGroup', { count: bubble.tools.length }) }}</span>
-                      <span>{{ summarizeToolGroup(bubble.tools) }}</span>
-                    </summary>
-                    <div class="message__tools-list">
-                      <template v-for="tool in bubble.tools" :key="tool.id">
-                        <button
-                          class="tool-event"
-                          :class="`tool-event--${tool.status}`"
-                          type="button"
-                          @click="openToolDetail(tool)"
-                        >
-                          <span class="tool-event__name">
-                            {{ t('conversation.toolCall', { name: tool.toolName }) }}
-                          </span>
-                          <span class="tool-event__summary">
-                            {{ summarizeToolEvent(tool) }}
-                          </span>
-                          <span class="tool-event__status">
-                            {{ t(`workspace.toolStatus.${tool.status}`) }}
-                          </span>
-                        </button>
-                        <MarkdownPreview
-                          v-if="tool.assistantContent"
-                          class="tool-event__content"
-                          :content="tool.assistantContent"
+                    <button
+                      v-if="bubble.tools.length > 0"
+                      class="message__tools-toggle"
+                      type="button"
+                      :aria-label="t('conversation.toolGroup', { count: bubble.tools.length })"
+                      :aria-expanded="isToolGroupExpanded(bubble.id)"
+                      @click="toggleToolGroup(bubble.id)"
+                    >
+                      <span
+                        class="message__tools-preview"
+                        :class="{ 'message__tools-preview--overflow': bubble.tools.length > 3 }"
+                      >
+                        <ToolEventIcon
+                          v-for="tool in bubble.tools.slice(0, 3)"
+                          :key="tool.id"
+                          :tool-name="tool.toolName"
+                          :status="tool.status"
                         />
-                      </template>
-                    </div>
-                  </details>
+                      </span>
+                      <ChevronDown
+                        class="message__tools-chevron"
+                        :class="{ 'message__tools-chevron--expanded': isToolGroupExpanded(bubble.id) }"
+                        :size="12"
+                        aria-hidden="true"
+                      />
+                    </button>
+                  </div>
+                  <div
+                    v-if="bubble.tools.length > 0 && isToolGroupExpanded(bubble.id)"
+                    class="message__tools-list"
+                  >
+                    <template v-for="tool in bubble.tools" :key="tool.id">
+                      <button
+                        class="tool-event"
+                        :class="`tool-event--${tool.status}`"
+                        type="button"
+                        :aria-label="toolEventLabel(tool)"
+                        @click="openToolDetail(tool)"
+                      >
+                        <ToolEventIcon :tool-name="tool.toolName" :status="tool.status" />
+                        <span class="tool-event__summary">
+                          {{ summarizeToolEvent(tool) }}
+                        </span>
+                      </button>
+                      <MarkdownPreview
+                        v-if="tool.assistantContent"
+                        class="tool-event__content"
+                        :content="tool.assistantContent"
+                      />
+                    </template>
+                  </div>
 
                   <template v-if="bubble.message">
                     <MarkdownPreview
@@ -132,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronLeft, ChevronRight } from '@lucide/vue'
+import { ChevronDown, ChevronLeft, ChevronRight } from '@lucide/vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -140,8 +155,10 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import ToolCallDetailDialog from '@/components/ToolCallDetailDialog.vue'
+import ToolEventIcon from '@/components/ToolEventIcon.vue'
 import { useAgentStore } from '@/stores/agent'
 import type { ConversationMessageEvent, ConversationToolEvent } from '@/types/agent'
+import { summarizeToolEvent as summarizeTool } from '@/utils/toolPresentation'
 
 type ConversationBubble =
   | {
@@ -172,6 +189,7 @@ const shouldStickToBottom = ref(true)
 const lastMessagesScrollTop = ref(0)
 const selectedToolId = ref('')
 const toolDetailVisible = ref(false)
+const expandedToolGroups = ref<Record<string, boolean>>({})
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const conversationBubbles = computed<ConversationBubble[]>(() => {
@@ -229,6 +247,17 @@ const selectedTool = computed(() => {
 function openToolDetail(tool: ConversationToolEvent) {
   selectedToolId.value = tool.id
   toolDetailVisible.value = true
+}
+
+function isToolGroupExpanded(bubbleId: string): boolean {
+  return expandedToolGroups.value[bubbleId] ?? false
+}
+
+function toggleToolGroup(bubbleId: string) {
+  expandedToolGroups.value = {
+    ...expandedToolGroups.value,
+    [bubbleId]: !isToolGroupExpanded(bubbleId),
+  }
 }
 
 function handleMessagesScroll() {
@@ -390,165 +419,16 @@ function formatAnswerDuration(durationMs: number): string {
   return `${(durationMs / 1000).toFixed(1)}s`
 }
 
-function parseToolPayload(payload: string): unknown {
-  if (!payload) {
-    return undefined
-  }
-
-  try {
-    return JSON.parse(payload)
-  } catch {
-    return undefined
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
-function getString(value: Record<string, unknown>, key: string): string {
-  const result = value[key]
-
-  return typeof result === 'string' ? result : ''
-}
-
-function getNumber(value: Record<string, unknown>, key: string): number | undefined {
-  const result = value[key]
-
-  return typeof result === 'number' ? result : undefined
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
-
-function hasRunningTool(tools: ConversationToolEvent[]): boolean {
-  return tools.some((tool) => tool.status === 'running')
-}
-
-function summarizeToolGroup(tools: ConversationToolEvent[]): string {
-  const runningCount = tools.filter((tool) => tool.status === 'running').length
-  const errorCount = tools.filter((tool) => tool.status === 'error').length
-
-  if (runningCount > 0) {
-    return t('conversation.toolGroupRunning', { count: runningCount })
-  }
-
-  if (errorCount > 0) {
-    return t('conversation.toolGroupFailed', { count: errorCount })
-  }
-
-  return t('conversation.toolGroupCompleted')
-}
-
 function summarizeToolEvent(tool: ConversationToolEvent): string {
-  if (tool.error) {
-    return tool.error
-  }
+  return summarizeTool(tool, t)
+}
 
-  const input = parseToolPayload(tool.input)
-  const output = parseToolPayload(tool.output)
-  const inputRecord = isRecord(input) ? input : undefined
-  const outputRecord = isRecord(output) ? output : undefined
-
-  switch (tool.toolName) {
-    case 'list_files': {
-      const files = Array.isArray(outputRecord?.files) ? outputRecord.files.length : undefined
-      return files === undefined
-        ? t('conversation.toolSummary.listFiles')
-        : t('conversation.toolSummary.listFilesWithCount', { count: files })
-    }
-    case 'search_files': {
-      const matches =
-        getNumber(outputRecord ?? {}, 'totalMatches') ??
-        (Array.isArray(outputRecord?.matches) ? outputRecord.matches.length : undefined)
-      return matches === undefined
-        ? t('conversation.toolSummary.searchFiles')
-        : t('conversation.toolSummary.searchFilesWithCount', { count: matches })
-    }
-    case 'read_files': {
-      const files = Array.isArray(outputRecord?.files) ? outputRecord.files.length : undefined
-      return files === undefined
-        ? t('conversation.toolSummary.readFiles')
-        : t('conversation.toolSummary.readFilesWithCount', { count: files })
-    }
-    case 'write_file': {
-      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
-      const bytes = getNumber(outputRecord ?? {}, 'bytes')
-
-      if (path && bytes !== undefined) {
-        return t('conversation.toolSummary.writeFileWithBytes', {
-          path,
-          bytes: formatBytes(bytes),
-        })
-      }
-
-      return path
-        ? t('conversation.toolSummary.writeFile', { path })
-        : t('conversation.toolSummary.writeFileFallback')
-    }
-    case 'edit_file': {
-      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
-      const bytes = getNumber(outputRecord ?? {}, 'bytes')
-
-      if (path && bytes !== undefined) {
-        return t('conversation.toolSummary.editFileWithBytes', {
-          path,
-          bytes: formatBytes(bytes),
-        })
-      }
-
-      return path
-        ? t('conversation.toolSummary.editFile', { path })
-        : t('conversation.toolSummary.editFileFallback')
-    }
-    case 'replace_in_file': {
-      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
-      const replacements = getNumber(outputRecord ?? {}, 'replacements')
-
-      if (path && replacements !== undefined) {
-        return t('conversation.toolSummary.replaceInFileWithCount', { path, count: replacements })
-      }
-
-      return path
-        ? t('conversation.toolSummary.replaceInFile', { path })
-        : t('conversation.toolSummary.replaceInFileFallback')
-    }
-    case 'delete_file': {
-      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
-      return path
-        ? t('conversation.toolSummary.deleteFile', { path })
-        : t('conversation.toolSummary.deleteFileFallback')
-    }
-    case 'rename_file': {
-      const fromPath =
-        getString(inputRecord ?? {}, 'fromPath') || getString(outputRecord ?? {}, 'fromPath')
-      const toPath = getString(inputRecord ?? {}, 'toPath') || getString(outputRecord ?? {}, 'toPath')
-
-      return fromPath && toPath
-        ? t('conversation.toolSummary.renameFile', { fromPath, toPath })
-        : t('conversation.toolSummary.renameFileFallback')
-    }
-    case 'delete_directory': {
-      const path = getString(inputRecord ?? {}, 'path') || getString(outputRecord ?? {}, 'path')
-      return path
-        ? t('conversation.toolSummary.deleteDirectory', { path })
-        : t('conversation.toolSummary.deleteDirectoryFallback')
-    }
-    case 'rename_directory': {
-      const fromPath = getString(inputRecord ?? {}, 'fromPath') || getString(outputRecord ?? {}, 'fromPath')
-      const toPath = getString(inputRecord ?? {}, 'toPath') || getString(outputRecord ?? {}, 'toPath')
-      return fromPath && toPath
-        ? t('conversation.toolSummary.renameDirectory', { fromPath, toPath })
-        : t('conversation.toolSummary.renameDirectoryFallback')
-    }
-    default:
-      return t('conversation.toolSummary.generic')
-  }
+function toolEventLabel(tool: ConversationToolEvent): string {
+  return t('conversation.toolEventLabel', {
+    name: tool.toolName,
+    summary: summarizeToolEvent(tool),
+    status: t(`workspace.toolStatus.${tool.status}`),
+  })
 }
 </script>
 
@@ -559,7 +439,7 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   min-height: 0;
   flex: 1;
   flex-direction: column;
-  background: #fff;
+  background: var(--ui-background2);
 }
 
 .chat-panel__header {
@@ -738,46 +618,56 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   margin-bottom: 8px;
 }
 
-.message__tools {
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-  background: var(--ui-bg-color-page);
-  margin-bottom: 10px;
-}
-
-.message__tools-summary {
+.message__tools-toggle {
   display: flex;
+  height: 24px;
   align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  list-style: none;
-  padding: 10px 12px;
-}
-
-.message__tools-summary::-webkit-details-marker {
-  display: none;
-}
-
-.message__tools-summary span:first-child {
-  flex: 0 0 auto;
-  color: var(--ui-text-color-primary);
-  font-size: 13px;
-  font-weight: 650;
-}
-
-.message__tools-summary span:last-child {
-  min-width: 0;
-  overflow: hidden;
+  gap: 3px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--ui-text-color-secondary);
-  font-size: 12px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+
+.message__tools-toggle:hover {
+  background: var(--ui-fill-color-light);
+}
+
+.message__tools-toggle:focus-visible {
+  outline: 2px solid var(--ui-color-primary);
+  outline-offset: 1px;
+}
+
+.message__tools-preview {
+  display: flex;
+  width: fit-content;
+  max-width: 52px;
+  align-items: center;
+  gap: 2px;
+}
+
+.message__tools-preview--overflow {
+  mask-image: linear-gradient(to right, #000 0%, #000 68%, transparent 100%);
+}
+
+.message__tools-chevron {
+  flex: 0 0 auto;
+  transition: transform 160ms ease;
+}
+
+.message__tools-chevron--expanded {
+  transform: rotate(180deg);
 }
 
 .message__tools-list {
   display: grid;
   gap: 8px;
-  border-top: 1px solid var(--ui-border-color-light);
+  border: 1px solid var(--ui-border-color-light);
+  border-radius: 8px;
+  background: var(--ui-bg-color-page);
+  margin-bottom: 10px;
   padding: 10px;
 }
 
@@ -815,31 +705,12 @@ function summarizeToolEvent(tool: ConversationToolEvent): string {
   outline-offset: 2px;
 }
 
-.tool-event--success {
-  border-color: #bbf7d0;
-}
-
-.tool-event--error {
-  border-color: #fecaca;
-}
-
-.tool-event__name {
-  flex: 0 0 auto;
-  color: var(--ui-text-color-primary);
-  font-size: 13px;
-  font-weight: 650;
-}
-
 .tool-event__summary {
   min-width: 0;
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.tool-event__status {
-  flex: 0 0 auto;
-  font-size: 12px;
 }
 
 </style>

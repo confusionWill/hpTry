@@ -17,7 +17,6 @@
       <span class="preview-aspect-ratio-select__swatch-frame" aria-hidden="true">
         <span
           class="preview-aspect-ratio-select__swatch"
-          :class="{ 'preview-aspect-ratio-select__swatch--none': selectedOption.value === 'none' }"
           :style="getRatioSwatchStyle(selectedOption)"
         />
       </span>
@@ -39,7 +38,6 @@
         <span class="preview-aspect-ratio-select__swatch-frame" aria-hidden="true">
           <span
             class="preview-aspect-ratio-select__swatch"
-            :class="{ 'preview-aspect-ratio-select__swatch--none': option.value === 'none' }"
             :style="getRatioSwatchStyle(option)"
           />
         </span>
@@ -56,7 +54,7 @@ import { useI18n } from 'vue-i18n'
 
 interface AspectRatioOption {
   label: string
-  ratio: number | null
+  ratio: number
   value: string
 }
 
@@ -67,11 +65,6 @@ const open = ref(false)
 const rootRef = ref<HTMLElement>()
 
 const aspectRatioOptions = computed<AspectRatioOption[]>(() => [
-  {
-    label: t('workspace.livePreview.aspectRatioNone'),
-    ratio: null,
-    value: 'none',
-  },
   {
     label: '16:9',
     ratio: 16 / 9,
@@ -125,13 +118,6 @@ function handleDocumentPointerDown(event: PointerEvent) {
 }
 
 function getRatioSwatchStyle(option: AspectRatioOption): Record<string, string> {
-  if (option.ratio === null) {
-    return {
-      height: '16px',
-      width: '16px',
-    }
-  }
-
   const size = 16
   const width = option.ratio >= 1 ? size : size * option.ratio
   const height = option.ratio >= 1 ? size / option.ratio : size
@@ -258,13 +244,6 @@ function getRatioSwatchStyle(option: AspectRatioOption): Record<string, string> 
   border-radius: 2px;
   background: currentColor;
   opacity: 0.78;
-}
-
-.preview-aspect-ratio-select__swatch--none {
-  aspect-ratio: 1;
-  background:
-    linear-gradient(135deg, transparent 45%, currentColor 47%, currentColor 53%, transparent 55%),
-    var(--ui-bg-color);
 }
 
 @media (max-width: 980px) {

@@ -52,11 +52,8 @@
       "missingProject": "请先选择项目。",
       "messageHeading": "临时资源："
     },
-    "toolCall": "工具调用：{name}",
     "toolGroup": "工具调用 {count} 次",
-    "toolGroupRunning": "{count} 个运行中",
-    "toolGroupFailed": "{count} 个失败",
-    "toolGroupCompleted": "已完成",
+    "toolEventLabel": "{name}：{summary}，{status}",
     "toolInput": "输入",
     "toolOutput": "输出",
     "toolError": "错误",
@@ -135,7 +132,6 @@
     "livePreview": {
       "title": "实时预览",
       "aspectRatio": "比例",
-      "aspectRatioNone": "无",
       "enterFullscreen": "全屏预览",
       "exitFullscreen": "退出全屏",
       "slideList": "幻灯片预览",

@@ -52,11 +52,8 @@
       "missingProject": "Select a project first.",
       "messageHeading": ".tmp assets:"
     },
-    "toolCall": "Tool call: {name}",
     "toolGroup": "{count} tool calls",
-    "toolGroupRunning": "{count} running",
-    "toolGroupFailed": "{count} failed",
-    "toolGroupCompleted": "Completed",
+    "toolEventLabel": "{name}: {summary}, {status}",
     "toolInput": "Input",
     "toolOutput": "Output",
     "toolError": "Error",
@@ -135,7 +132,6 @@
     "livePreview": {
       "title": "Live preview",
       "aspectRatio": "Ratio",
-      "aspectRatioNone": "None",
       "enterFullscreen": "Preview fullscreen",
       "exitFullscreen": "Exit fullscreen",
       "slideList": "Slide previews",

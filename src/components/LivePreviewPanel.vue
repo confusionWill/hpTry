@@ -35,6 +35,7 @@
       />
       <div v-else class="live-preview__stage">
         <div
+          ref="previewViewportRef"
           class="live-preview__viewport"
           :class="{ 'live-preview__viewport--fixed': selectedAspectRatioValue !== null }"
           :style="previewViewportStyle"
@@ -70,49 +71,77 @@ const presentationStore = usePresentationStore()
 const { t } = useI18n()
 const previewWorkerReady = ref(false)
 const previewFrameRef = ref<HTMLIFrameElement | null>(null)
+const previewViewportRef = ref<HTMLDivElement | null>(null)
 const isPreviewFullscreen = ref(false)
 let observedPreviewWindow: Window | null = null
+let previewResizeObserver: ResizeObserver | null = null
 
-const selectedAspectRatio = ref('none')
+const selectedAspectRatio = ref('16-9')
 
-const aspectRatioMap: Record<string, number | null> = {
-  '16-9': 16 / 9,
-  '21-9': 21 / 9,
-  '9-16': 9 / 16,
-  '4-3': 4 / 3,
-  '3-4': 3 / 4,
-  none: null,
+interface PreviewCanvasSize {
+  width: number
+  height: number
 }
 
-const selectedAspectRatioValue = computed(() => aspectRatioMap[selectedAspectRatio.value] ?? null)
+const previewCanvasSizeMap: Record<string, PreviewCanvasSize | null> = {
+  '16-9': { width: 1600, height: 900 },
+  '21-9': { width: 2100, height: 900 },
+  '9-16': { width: 900, height: 1600 },
+  '4-3': { width: 1200, height: 900 },
+  '3-4': { width: 900, height: 1200 },
+}
+
+const selectedCanvasSize = computed(() => previewCanvasSizeMap[selectedAspectRatio.value] ?? null)
+const selectedAspectRatioValue = computed(() => {
+  const size = selectedCanvasSize.value
+
+  return size ? size.width / size.height : null
+})
 const canUseFullscreen = computed(
   () =>
     Boolean(presentationStore.indexFile) &&
     previewWorkerReady.value &&
     document.fullscreenEnabled &&
-    Boolean(previewFrameRef.value?.requestFullscreen),
+    Boolean(previewViewportRef.value?.requestFullscreen),
 )
 
 const previewViewportStyle = computed<Partial<Record<string, string>>>(() => {
-  if (selectedAspectRatioValue.value === null) {
+  const size = selectedCanvasSize.value
+
+  if (!size) {
     return {}
   }
 
   return {
-    '--preview-aspect-ratio': selectedAspectRatioValue.value.toString(),
+    '--preview-aspect-ratio': (size.width / size.height).toString(),
+    '--preview-canvas-width': `${size.width}px`,
+    '--preview-canvas-height': `${size.height}px`,
   }
 })
 
 const indexFile = computed(() => presentationStore.indexFile)
 
 onMounted(async () => {
-  previewWorkerReady.value = await registerPreviewWorker()
   document.addEventListener('fullscreenchange', syncFullscreenState)
+  previewResizeObserver = new ResizeObserver(updatePreviewScale)
+  previewWorkerReady.value = await registerPreviewWorker()
 })
 
 onUnmounted(() => {
   detachPreviewHashListener()
+  previewResizeObserver?.disconnect()
   document.removeEventListener('fullscreenchange', syncFullscreenState)
+})
+
+watch(selectedCanvasSize, () => requestAnimationFrame(updatePreviewScale))
+watch(previewViewportRef, (viewport, previousViewport) => {
+  if (previousViewport) {
+    previewResizeObserver?.unobserve(previousViewport)
+  }
+  if (viewport) {
+    previewResizeObserver?.observe(viewport)
+    updatePreviewScale()
+  }
 })
 
 watch(
@@ -177,7 +206,7 @@ async function togglePreviewFullscreen() {
       return
     }
 
-    await previewFrameRef.value?.requestFullscreen()
+    await previewViewportRef.value?.requestFullscreen()
     focusPreviewFrame()
   } catch {
     syncFullscreenState()
@@ -185,11 +214,27 @@ async function togglePreviewFullscreen() {
 }
 
 function syncFullscreenState() {
-  isPreviewFullscreen.value = document.fullscreenElement === previewFrameRef.value
+  isPreviewFullscreen.value = document.fullscreenElement === previewViewportRef.value
 
   if (isPreviewFullscreen.value) {
     focusPreviewFrame()
   }
+}
+
+function updatePreviewScale() {
+  const viewport = previewViewportRef.value
+  const canvasSize = selectedCanvasSize.value
+
+  if (!viewport || !canvasSize) {
+    viewport?.style.removeProperty('--preview-canvas-scale')
+    return
+  }
+
+  const scale = Math.min(
+    viewport.clientWidth / canvasSize.width,
+    viewport.clientHeight / canvasSize.height,
+  )
+  viewport.style.setProperty('--preview-canvas-scale', String(scale))
 }
 
 function focusPreviewFrame() {
@@ -280,8 +325,10 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
 }
 
 .live-preview__viewport {
+  position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
   background: #ffffff;
   /* box-shadow: 0 0 10px #eee; */
 }
@@ -299,6 +346,19 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   height: 100%;
   border: 0;
   background: #ffffff;
+}
+
+.live-preview__viewport--fixed .live-preview__frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--preview-canvas-width);
+  height: var(--preview-canvas-height);
+  transform: translate(-50%, -50%) scale(var(--preview-canvas-scale, 0));
+}
+
+.live-preview__viewport:fullscreen {
+  background: #111318;
 }
 
 </style>

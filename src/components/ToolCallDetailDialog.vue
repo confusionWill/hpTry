@@ -3,16 +3,14 @@
     v-model="model"
     :aria-label="t('conversation.toolDetail.ariaLabel')"
     :show-header="true"
-    :title="tool ? t('conversation.toolCall', { name: tool.toolName }) : ''"
+    :title="toolSummary"
     width="min(760px, 92vw)"
     @closed="emit('closed')"
   >
     <template v-if="tool" #header>
       <div class="tool-detail__title">
-        <h2>{{ t('conversation.toolCall', { name: tool.toolName }) }}</h2>
-        <strong :class="`tool-detail__status--${tool.status}`">
-          {{ t(`workspace.toolStatus.${tool.status}`) }}
-        </strong>
+        <ToolEventIcon :tool-name="tool.toolName" :status="tool.status" />
+        <h2>{{ toolSummary }}</h2>
       </div>
     </template>
 
@@ -34,14 +32,17 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import ToolEventIcon from '@/components/ToolEventIcon.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import type { ConversationToolEvent } from '@/types/agent'
+import { summarizeToolEvent } from '@/utils/toolPresentation'
 
 const model = defineModel<boolean>({ required: true })
 
-defineProps<{
+const props = defineProps<{
   tool?: ConversationToolEvent
 }>()
 
@@ -50,6 +51,9 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const toolSummary = computed(() =>
+  props.tool ? summarizeToolEvent(props.tool, t) : '',
+)
 
 function formatPayload(payload: string): string {
   if (!payload) {
@@ -81,20 +85,6 @@ function formatPayload(payload: string): string {
   color: var(--ui-text-color-primary);
   font-size: 16px;
   font-weight: 650;
-}
-
-.tool-detail__title strong {
-  color: var(--ui-text-color-secondary);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.tool-detail__status--success {
-  color: #15803d;
-}
-
-.tool-detail__status--error {
-  color: #dc2626;
 }
 
 .tool-detail section {

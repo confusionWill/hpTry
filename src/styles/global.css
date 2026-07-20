@@ -23,7 +23,8 @@
   --ui-text-color-placeholder: #94a3b8;
   --ui-scrollbar-thumb: #eeeeee;
   --ui-scrollbar-thumb-hover: #e0e0e0;
-  --ui-background: #f7f7f7;
+  --ui-background: #f5f5f5;
+  --ui-background2: #fbfbfb;
 }
 
 * {
