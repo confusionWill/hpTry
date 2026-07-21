@@ -34,7 +34,7 @@
     <PresentationSlideSidebar
       v-if="presentationStore.manifest && presentationStore.previewUrl"
       :active-page="presentationStore.activeSlidePage"
-      :aspect-ratio="presentationStore.manifest.aspectRatio"
+      :canvas-size="presentationStore.selectedCanvasSize"
       :preview-url="presentationStore.previewUrl"
       :slides="presentationStore.manifest.slides"
       @select="presentationStore.selectSlide"

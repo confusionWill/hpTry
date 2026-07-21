@@ -66,12 +66,6 @@
                       :style="avatarTransitionStyle(bubble.id)"
                       aria-hidden="true"
                     />
-                    <span
-                      v-if="bubble.message?.responseDurationMs !== undefined"
-                      class="message__answer-duration"
-                    >
-                      {{ formatAnswerDuration(bubble.message.responseDurationMs) }}
-                    </span>
                     <button
                       v-if="bubble.tools.length > 0"
                       class="message__tools-toggle"
@@ -91,19 +85,30 @@
                           :status="tool.status"
                         />
                       </span>
-                      <ChevronDown
+                      <ChevronRight
                         class="message__tools-chevron"
                         :class="{ 'message__tools-chevron--expanded': isToolGroupExpanded(bubble.id) }"
                         :size="12"
                         aria-hidden="true"
                       />
                     </button>
+                    <span
+                      v-if="bubble.message?.responseDurationMs !== undefined"
+                      class="message__answer-duration"
+                    >
+                      {{ formatAnswerDuration(bubble.message.responseDurationMs) }}
+                    </span>
                   </div>
                   <div
                     v-if="bubble.tools.length > 0 && isToolGroupExpanded(bubble.id)"
                     class="message__tools-list"
                   >
                     <template v-for="tool in bubble.tools" :key="tool.id">
+                      <MarkdownPreview
+                        v-if="tool.assistantContent"
+                        class="tool-event__content"
+                        :content="tool.assistantContent"
+                      />
                       <button
                         class="tool-event"
                         :class="`tool-event--${tool.status}`"
@@ -116,11 +121,6 @@
                           {{ summarizeToolEvent(tool) }}
                         </span>
                       </button>
-                      <MarkdownPreview
-                        v-if="tool.assistantContent"
-                        class="tool-event__content"
-                        :content="tool.assistantContent"
-                      />
                     </template>
                   </div>
 
@@ -147,7 +147,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronDown, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { ChevronLeft, ChevronRight } from '@lucide/vue'
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -434,6 +434,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 
 <style scoped>
 .chat-panel {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -443,11 +444,13 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 }
 
 .chat-panel__header {
+  position: absolute;
+  z-index: 2;
+  top: 12px;
+  right: 12px;
   display: flex;
-  min-height: 48px;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 12px;
 }
 
 .chat-panel__collapse {
@@ -496,11 +499,24 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 }
 
 .chat-panel__body {
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;
   flex: 1;
   overflow: hidden;
+}
+
+.chat-panel__body::before {
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 28px;
+  background: linear-gradient(to bottom, var(--ui-background2), transparent);
+  content: '';
+  pointer-events: none;
 }
 
 .chat-panel__conversation {
@@ -519,7 +535,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   gap: 12px;
   overflow: auto;
   overscroll-behavior: contain;
-  padding: 18px 18px 40px;
+  padding: 68px 18px 40px;
 }
 
 .messages__history-status {
@@ -658,24 +674,23 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 }
 
 .message__tools-chevron--expanded {
-  transform: rotate(180deg);
+  transform: rotate(90deg);
 }
 
 .message__tools-list {
   display: grid;
-  gap: 8px;
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-  background: var(--ui-bg-color-page);
+  gap: 2px;
   margin-bottom: 10px;
-  padding: 10px;
 }
 
 .tool-event__content {
-  padding: 0 4px 4px;
+  padding: 4px 0 2px;
+  color: var(--ui-text-color-secondary);
+  font-size: 12px;
 }
 
 .message__answer-duration {
+  margin-left: auto;
   color: var(--ui-text-color-secondary);
   font-size: 12px;
   line-height: 1.4;
@@ -685,14 +700,15 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 12px;
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-  background: var(--ui-fill-color-blank);
+  gap: 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
   color: var(--ui-text-color-secondary);
   cursor: pointer;
   font: inherit;
-  padding: 10px 12px;
+  font-size: 12px;
+  padding: 6px 0;
   text-align: left;
 }
 

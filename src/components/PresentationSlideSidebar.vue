@@ -11,7 +11,11 @@
           @click="emit('select', index + 1)"
         >
           <span class="slide-sidebar__number">{{ index + 1 }}</span>
-          <span class="slide-sidebar__thumbnail" :style="thumbnailStyle">
+          <span
+            :ref="(element) => setThumbnailRef(index, element)"
+            class="slide-sidebar__thumbnail"
+            :style="thumbnailStyle"
+          >
             <iframe
               aria-hidden="true"
               class="slide-sidebar__frame"
@@ -30,12 +34,15 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import type { ComponentPublicInstance, CSSProperties } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+
+import type { PreviewCanvasSize } from '@/utils/presentationCanvas'
 
 const props = defineProps<{
   activePage: number
-  aspectRatio: string
+  canvasSize: PreviewCanvasSize
   previewUrl: string
   slides: string[]
 }>()
@@ -45,19 +52,62 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const thumbnailElements = new Map<number, HTMLElement>()
+let thumbnailResizeObserver: ResizeObserver | null = null
 
-const thumbnailStyle = computed(() => ({
-  aspectRatio: normalizeAspectRatio(props.aspectRatio),
+const thumbnailStyle = computed<CSSProperties>(() => ({
+  aspectRatio: `${props.canvasSize.width} / ${props.canvasSize.height}`,
+  '--slide-canvas-width': `${props.canvasSize.width}px`,
+  '--slide-canvas-height': `${props.canvasSize.height}px`,
 }))
 
-function normalizeAspectRatio(value: string): string {
-  const match = /^\s*(\d+(?:\.\d+)?)\s*:\s*(\d+(?:\.\d+)?)\s*$/.exec(value)
+onMounted(() => {
+  thumbnailResizeObserver = new ResizeObserver((entries) => {
+    entries.forEach(({ target }) => updateThumbnailScale(target as HTMLElement))
+  })
 
-  if (!match || Number(match[1]) <= 0 || Number(match[2]) <= 0) {
-    return '16 / 9'
+  thumbnailElements.forEach((element) => {
+    thumbnailResizeObserver?.observe(element)
+    updateThumbnailScale(element)
+  })
+})
+
+onBeforeUnmount(() => {
+  thumbnailResizeObserver?.disconnect()
+})
+
+watch(
+  () => props.canvasSize,
+  () => nextTick(() => thumbnailElements.forEach(updateThumbnailScale)),
+)
+
+function setThumbnailRef(
+  index: number,
+  element: Element | ComponentPublicInstance | null,
+) {
+  const previousElement = thumbnailElements.get(index)
+
+  if (previousElement) {
+    thumbnailResizeObserver?.unobserve(previousElement)
+    thumbnailElements.delete(index)
   }
 
-  return `${match[1]} / ${match[2]}`
+  if (!(element instanceof HTMLElement)) {
+    return
+  }
+
+  thumbnailElements.set(index, element)
+  thumbnailResizeObserver?.observe(element)
+  updateThumbnailScale(element)
+}
+
+function updateThumbnailScale(element: HTMLElement) {
+  const scale = Math.min(
+    element.clientWidth / props.canvasSize.width,
+    element.clientHeight / props.canvasSize.height,
+  )
+
+  element.style.setProperty('--slide-thumbnail-scale', String(scale))
 }
 
 function thumbnailUrl(page: number): string {
@@ -161,12 +211,15 @@ function thumbnailUrl(page: number): string {
 }
 
 .slide-sidebar__frame {
+  position: absolute;
+  top: 0;
+  left: 0;
   display: block;
-  width: 800%;
-  height: 800%;
+  width: var(--slide-canvas-width);
+  height: var(--slide-canvas-height);
   border: 0;
   pointer-events: none;
-  transform: scale(0.125);
+  transform: scale(var(--slide-thumbnail-scale, 0));
   transform-origin: top left;
 }
 

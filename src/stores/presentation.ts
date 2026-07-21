@@ -4,11 +4,19 @@ import { defineStore } from 'pinia'
 import { parsePresentationManifest } from '@/services/presentationManifest'
 import { useAgentStore } from '@/stores/agent'
 import type { WorkspaceFile } from '@/types/agent'
+import {
+  PREVIEW_CANVAS_SIZE_MAP,
+  type PreviewAspectRatio,
+} from '@/utils/presentationCanvas'
 
 export const usePresentationStore = defineStore('presentation', () => {
   const agentStore = useAgentStore()
   const activeSlidePage = ref(1)
   const committedPreviewVersion = ref('0')
+  const selectedAspectRatio = ref<PreviewAspectRatio>('16-9')
+  const selectedCanvasSize = computed(
+    () => PREVIEW_CANVAS_SIZE_MAP[selectedAspectRatio.value],
+  )
 
   const fileMap = computed(() => {
     const files = new Map<string, WorkspaceFile>()
@@ -118,6 +126,8 @@ export const usePresentationStore = defineStore('presentation', () => {
     mainPreviewUrl,
     manifest,
     previewUrl,
+    selectedAspectRatio,
+    selectedCanvasSize,
     selectSlide,
   }
 })

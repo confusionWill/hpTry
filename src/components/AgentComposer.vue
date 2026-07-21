@@ -28,21 +28,9 @@
         </template>
       </UiButton>
       <div class="agent-composer__main">
-        <UiTextarea
-          ref="textareaRef"
-          v-model="draft"
-          autosize
-          class="agent-composer__input"
-          :aria-label="t('conversation.inputAriaLabel')"
-          :disabled="isUploadingFiles"
-          :min-rows="2"
-          :max-rows="6"
-          @keydown="handleComposerKeydown"
-        />
         <div v-if="currentProjectAssets.length > 0" class="agent-composer__assets">
           <article v-for="asset in currentProjectAssets" :key="asset.path" class="uploaded-asset">
-            <span class="uploaded-asset__name">{{ fileNameForPath(asset.path) }}</span>
-            <span class="uploaded-asset__path">{{ asset.path }}</span>
+            <span class="uploaded-asset__path" :title="asset.path">{{ asset.path }}</span>
             <UiButton
               circle
               text
@@ -57,6 +45,17 @@
             </UiButton>
           </article>
         </div>
+        <UiTextarea
+          ref="textareaRef"
+          v-model="draft"
+          autosize
+          class="agent-composer__input"
+          :aria-label="t('conversation.inputAriaLabel')"
+          :disabled="isUploadingFiles"
+          :min-rows="2"
+          :max-rows="6"
+          @keydown="handleComposerKeydown"
+        />
       </div>
       <UiButton
         circle
@@ -520,7 +519,7 @@ function handleComposerAction() {
 .agent-composer__main {
   display: grid;
   min-width: 0;
-  gap: 8px;
+  gap: 6px;
   border-radius: 10px 10px 0 0;
   background: #fffefb;
   margin-bottom: -14px;
@@ -543,6 +542,7 @@ function handleComposerAction() {
   min-width: 0;
   flex-wrap: wrap;
   gap: 6px;
+  padding: 8px 10px 0;
 }
 
 .agent-composer__stop-icon--stopping {
@@ -563,40 +563,32 @@ function handleComposerAction() {
 .uploaded-asset {
   display: inline-grid;
   min-width: 0;
-  max-width: min(360px, 100%);
+  max-width: 100%;
+  flex: 0 1 auto;
   align-items: center;
   column-gap: 8px;
   grid-template-columns: minmax(0, 1fr) auto;
-  border: 1px solid var(--ui-border-color-light);
+  border: 0;
   border-radius: 7px;
   background: var(--ui-fill-color-light);
   padding: 6px 6px 6px 10px;
 }
 
-.uploaded-asset__name,
 .uploaded-asset__path {
   min-width: 0;
   overflow: hidden;
+  color: var(--ui-text-color-secondary);
+  font-size: 12px;
+  line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.uploaded-asset__name {
-  color: var(--ui-text-color-primary);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.uploaded-asset__path {
-  color: var(--ui-text-color-secondary);
-  font-size: 11px;
-}
-
 .uploaded-asset__remove {
-  grid-row: 1 / span 2;
   grid-column: 2;
   width: 26px;
   min-width: 26px;
   height: 26px;
+  min-height: 26px;
 }
 </style>

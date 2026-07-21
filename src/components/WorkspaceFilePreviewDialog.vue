@@ -6,17 +6,18 @@
     :title="file?.path ?? t('workspace.preview')"
     width="min(920px, 92vw)"
   >
+    <template #header>
+      <h2 class="file-preview-dialog__title">
+        {{ file ? fileNameForPath(file.path) : t('workspace.preview') }}
+      </h2>
+    </template>
+
     <UiEmpty
       v-if="!file"
       :description="t('workspace.emptyPreview')"
       :image-size="52"
     />
     <div v-else class="file-preview-dialog">
-      <div class="file-preview-dialog__meta">
-        <span>{{ file.path }}</span>
-        <small>{{ previewLabel }}</small>
-      </div>
-
       <pre v-if="previewType === 'text'" class="file-preview-dialog__text"><code>{{ textContent }}</code></pre>
       <div v-else-if="previewType === 'image'" class="file-preview-dialog__media">
         <img
@@ -98,13 +99,6 @@ const assetObjectUrl = ref('')
 const assetTextContent = ref('')
 
 const previewType = computed<PreviewType>(() => getPreviewType(props.file))
-const previewLabel = computed(() => {
-  if (!props.file) {
-    return ''
-  }
-
-  return props.file.mimeType ?? mimeTypeForPath(props.file.path) ?? props.file.language
-})
 const mediaSource = computed(() => {
   if (
     !props.file ||
@@ -263,6 +257,10 @@ function extensionForPath(path: string): string {
   return path.split('.').pop()?.toLowerCase() ?? ''
 }
 
+function fileNameForPath(path: string): string {
+  return path.split('/').pop() ?? path
+}
+
 function isBase64Content(content: string): boolean {
   return Boolean(content) && /^[A-Za-z0-9+/=]+$/.test(content) && content.length % 4 === 0
 }
@@ -318,48 +316,37 @@ const binaryExtensions = new Set([
 .file-preview-dialog {
   display: flex;
   min-height: min(62vh, 560px);
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--ui-border-color-light);
-  border-radius: 8px;
-}
-
-.file-preview-dialog__meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-bottom: 1px solid var(--ui-border-color-light);
-  background: var(--ui-fill-color-light);
-  padding: 8px 10px;
-}
-
-.file-preview-dialog__meta span {
   min-width: 0;
+  flex-direction: column;
+}
+
+.file-preview-dialog__title {
+  min-width: 0;
+  flex: 1;
   overflow: hidden;
-  font-size: 12px;
+  margin: 0;
+  color: var(--ui-text-color-primary);
+  font-size: 16px;
   font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.file-preview-dialog__meta small {
-  color: var(--ui-text-color-secondary);
-}
-
 .file-preview-dialog__text {
-  min-height: 0;
-  flex: 1;
+  min-width: 0;
   margin: 0;
-  overflow: auto;
-  padding: 12px;
 }
 
 .file-preview-dialog__text code {
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
   font-size: 12px;
   line-height: 1.6;
-  white-space: pre;
+}
+
+.file-preview-dialog > :deep(.ui-empty) {
+  min-height: 0;
+  flex: 1;
+  place-content: center;
 }
 
 .file-preview-dialog__media {
@@ -367,9 +354,7 @@ const binaryExtensions = new Set([
   min-height: 0;
   flex: 1;
   place-items: center;
-  overflow: auto;
   background: var(--ui-fill-color-lighter);
-  padding: 12px;
 }
 
 .file-preview-dialog__media img,
@@ -377,7 +362,6 @@ const binaryExtensions = new Set([
   display: block;
   max-width: 100%;
   max-height: 60vh;
-  border-radius: 6px;
 }
 
 .file-preview-dialog__media audio {

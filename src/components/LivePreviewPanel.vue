@@ -2,7 +2,7 @@
   <section class="live-preview">
     <header class="live-preview__header">
       <div class="live-preview__actions">
-        <PreviewAspectRatioSelect v-model="selectedAspectRatio" />
+        <PreviewAspectRatioSelect v-model="presentationStore.selectedAspectRatio" />
         <UiButton
           :aria-label="
             isPreviewFullscreen
@@ -76,22 +76,7 @@ const isPreviewFullscreen = ref(false)
 let observedPreviewWindow: Window | null = null
 let previewResizeObserver: ResizeObserver | null = null
 
-const selectedAspectRatio = ref('16-9')
-
-interface PreviewCanvasSize {
-  width: number
-  height: number
-}
-
-const previewCanvasSizeMap: Record<string, PreviewCanvasSize | null> = {
-  '16-9': { width: 1600, height: 900 },
-  '21-9': { width: 2100, height: 900 },
-  '9-16': { width: 900, height: 1600 },
-  '4-3': { width: 1200, height: 900 },
-  '3-4': { width: 900, height: 1200 },
-}
-
-const selectedCanvasSize = computed(() => previewCanvasSizeMap[selectedAspectRatio.value] ?? null)
+const selectedCanvasSize = computed(() => presentationStore.selectedCanvasSize)
 const selectedAspectRatioValue = computed(() => {
   const size = selectedCanvasSize.value
 

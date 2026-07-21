@@ -24,7 +24,7 @@ const renderedHtml = computed(() => renderMarkdown(props.content, !props.streami
   min-width: 0;
   overflow-wrap: anywhere;
   color: inherit;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.65;
 }
 
