@@ -30,13 +30,12 @@ const slideComponents = manifest.slides.map((slidePath) =>
 )
 
 const keyboardNavigation = {
-  enabled: manifest.navigation?.keyboard?.enabled !== false,
   prev: Array.isArray(manifest.navigation?.keyboard?.prev)
     ? manifest.navigation.keyboard.prev
-    : ['ArrowLeft'],
+    : ['ArrowLeft', 'ArrowUp'],
   next: Array.isArray(manifest.navigation?.keyboard?.next)
     ? manifest.navigation.keyboard.next
-    : ['ArrowRight'],
+    : ['ArrowRight', 'ArrowDown'],
 }
 
 function readHashState() {
@@ -76,7 +75,7 @@ const PresentationApp = {
     }
 
     function handleKeydown(event) {
-      if (state.value.thumbnail || !keyboardNavigation.enabled) {
+      if (state.value.thumbnail) {
         return
       }
 

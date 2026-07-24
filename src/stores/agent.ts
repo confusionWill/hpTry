@@ -580,12 +580,15 @@ export const useAgentStore = defineStore('agent', {
       files: WorkspaceFile[],
       path: string,
       content: string,
+      selectFile = true,
     ): Promise<WorkspaceFile> {
       const file = await upsertProjectWorkspaceFile(projectId, files, path, content)
 
       if (this.selectedProjectId === projectId) {
         this.workspaceFiles = [...files]
-        this.selectedWorkspaceFilePath = file.path
+        if (selectFile) {
+          this.selectedWorkspaceFilePath = file.path
+        }
       }
 
       return file

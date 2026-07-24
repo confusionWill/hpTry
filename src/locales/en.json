@@ -132,6 +132,7 @@
     "livePreview": {
       "title": "Live preview",
       "aspectRatio": "Ratio",
+      "customAspectRatio": "Custom",
       "enterFullscreen": "Preview fullscreen",
       "exitFullscreen": "Exit fullscreen",
       "slideList": "Slide previews",

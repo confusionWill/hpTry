@@ -32,7 +32,7 @@
     </div>
 
     <PresentationSlideSidebar
-      v-if="presentationStore.manifest && presentationStore.previewUrl"
+      v-if="presentationStore.manifest?.slides.length && presentationStore.previewUrl"
       :active-page="presentationStore.activeSlidePage"
       :canvas-size="presentationStore.selectedCanvasSize"
       :preview-url="presentationStore.previewUrl"

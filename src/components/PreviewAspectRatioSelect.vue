@@ -52,13 +52,22 @@ import { ChevronDown } from '@lucide/vue'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import type {
+  PreviewAspectRatioSelection,
+  PreviewCanvasSize,
+} from '@/utils/presentationCanvas'
+
 interface AspectRatioOption {
   label: string
   ratio: number
-  value: string
+  value: PreviewAspectRatioSelection
 }
 
-const model = defineModel<string>({ required: true })
+const props = defineProps<{
+  canvasSize: PreviewCanvasSize
+}>()
+
+const model = defineModel<PreviewAspectRatioSelection>({ required: true })
 
 const { t } = useI18n()
 const open = ref(false)
@@ -92,11 +101,20 @@ const aspectRatioOptions = computed<AspectRatioOption[]>(() => [
   },
 ])
 
-const selectedOption = computed(
-  () =>
+const selectedOption = computed<AspectRatioOption>(() => {
+  if (model.value === 'custom') {
+    return {
+      label: t('workspace.livePreview.customAspectRatio'),
+      ratio: props.canvasSize.width / props.canvasSize.height,
+      value: 'custom',
+    }
+  }
+
+  return (
     aspectRatioOptions.value.find((option) => option.value === model.value) ??
-    aspectRatioOptions.value[0],
-)
+    aspectRatioOptions.value[0]
+  )
+})
 
 onMounted(() => {
   document.addEventListener('pointerdown', handleDocumentPointerDown)
@@ -106,7 +124,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', handleDocumentPointerDown)
 })
 
-function selectOption(value: string) {
+function selectOption(value: PreviewAspectRatioSelection) {
   model.value = value
   open.value = false
 }

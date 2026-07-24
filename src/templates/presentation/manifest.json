@@ -1,16 +1,18 @@
 {
-  "version": 1,
   "name": "Untitled Presentation",
-  "entry": "./hp.html",
-  "aspectRatio": "16:9",
+  "size": {
+    "width": 1920,
+    "height": 1080
+  },
   "navigation": {
     "keyboard": {
-      "enabled": true,
       "prev": [
-        "ArrowLeft"
+        "ArrowLeft",
+        "ArrowUp"
       ],
       "next": [
-        "ArrowRight"
+        "ArrowRight",
+        "ArrowDown"
       ]
     }
   },

@@ -1,6 +1,6 @@
 import manifestTemplate from '@/templates/presentation/manifest.json?raw'
-import presentationRuntimeTemplate from '@/templates/presentation/core/main.js?raw'
-import presentationStyleTemplate from '@/templates/presentation/core/style.css?raw'
+import presentationRuntimeTemplate from '@/templates/presentation/runtime/main.js?raw'
+import presentationStyleTemplate from '@/templates/presentation/runtime/style.css?raw'
 import htmlTemplate from '@/templates/presentation/hp.html?raw'
 import firstSlideTemplate from '@/templates/presentation/slides/slide-001.js?raw'
 import vueBrowserRuntime from 'vue/dist/vue.esm-browser.prod.js?raw'
@@ -9,13 +9,13 @@ import { upsertProjectWorkspaceFile } from '@/services/agent/workspaceFiles'
 import type { WorkspaceFile } from '@/types/agent'
 
 interface PresentationManifest {
-  version: number
   name: string
-  entry: string
-  aspectRatio: string
+  size: {
+    width: number
+    height: number
+  }
   navigation: {
     keyboard: {
-      enabled: boolean
       prev: string[]
       next: string[]
     }
@@ -39,9 +39,9 @@ function createTemplateFiles(projectName: string): PresentationTemplateFile[] {
   return [
     { path: 'manifest.json', content: createManifest(projectName) },
     { path: 'hp.html', content: htmlTemplate },
-    { path: 'core/main.js', content: presentationRuntimeTemplate },
-    { path: 'core/style.css', content: presentationStyleTemplate },
-    { path: 'core/vue.esm-browser.prod.js', content: vueBrowserRuntime },
+    { path: 'runtime/main.js', content: presentationRuntimeTemplate },
+    { path: 'runtime/style.css', content: presentationStyleTemplate },
+    { path: 'runtime/vue.esm-browser.prod.js', content: vueBrowserRuntime },
     { path: 'slides/slide-001.js', content: firstSlideTemplate },
   ]
 }

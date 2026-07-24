@@ -132,6 +132,7 @@
     "livePreview": {
       "title": "实时预览",
       "aspectRatio": "比例",
+      "customAspectRatio": "自定义",
       "enterFullscreen": "全屏预览",
       "exitFullscreen": "退出全屏",
       "slideList": "幻灯片预览",

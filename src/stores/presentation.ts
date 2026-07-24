@@ -1,23 +1,32 @@
 import { computed, ref, watch } from 'vue'
 import { defineStore } from 'pinia'
 
-import { parsePresentationManifest } from '@/services/presentationManifest'
+import {
+  DEFAULT_PRESENTATION_SIZE,
+  parsePresentationManifest,
+} from '@/services/presentationManifest'
 import { useAgentStore } from '@/stores/agent'
 import type { WorkspaceFile } from '@/types/agent'
 import {
   PREVIEW_CANVAS_SIZE_MAP,
   type PreviewAspectRatio,
+  type PreviewAspectRatioSelection,
 } from '@/utils/presentationCanvas'
 
 export const usePresentationStore = defineStore('presentation', () => {
   const agentStore = useAgentStore()
   const activeSlidePage = ref(1)
   const committedPreviewVersion = ref('0')
-  const selectedAspectRatio = ref<PreviewAspectRatio>('16-9')
-  const selectedCanvasSize = computed(
-    () => PREVIEW_CANVAS_SIZE_MAP[selectedAspectRatio.value],
-  )
-
+  const selectedAspectRatioState = ref<PreviewAspectRatioSelection>('16-9')
+  const selectedAspectRatio = computed<PreviewAspectRatioSelection>({
+    get: () => selectedAspectRatioState.value,
+    set: (value) => {
+      selectedAspectRatioState.value = value
+      if (value !== 'custom') {
+        void syncManifestSize(value)
+      }
+    },
+  })
   const fileMap = computed(() => {
     const files = new Map<string, WorkspaceFile>()
 
@@ -59,6 +68,14 @@ export const usePresentationStore = defineStore('presentation', () => {
 
     return parsePresentationManifest(manifestFile.value.content)
   })
+
+  const selectedCanvasSize = computed(
+    () =>
+      manifest.value?.size ??
+      (selectedAspectRatioState.value === 'custom'
+        ? DEFAULT_PRESENTATION_SIZE
+        : PREVIEW_CANVAS_SIZE_MAP[selectedAspectRatioState.value]),
+  )
 
   const latestWorkspaceVersion = computed(() =>
     agentStore.workspaceFiles
@@ -112,6 +129,56 @@ export const usePresentationStore = defineStore('presentation', () => {
     },
   )
 
+  watch(
+    () => [agentStore.selectedProjectId, manifest.value?.size] as const,
+    ([, manifestSize]) => {
+      const size = manifestSize ?? DEFAULT_PRESENTATION_SIZE
+
+      const aspectRatio = findAspectRatioForSize(size.width, size.height)
+
+      selectedAspectRatioState.value = aspectRatio ?? 'custom'
+    },
+    { immediate: true },
+  )
+
+  async function syncManifestSize(aspectRatio: PreviewAspectRatio): Promise<void> {
+    const projectId = agentStore.selectedProjectId
+    const file = manifestFile.value
+
+    if (!projectId || !file || file.kind === 'asset') {
+      return
+    }
+
+    try {
+      const value = JSON.parse(file.content) as Record<string, unknown>
+      const size = PREVIEW_CANVAS_SIZE_MAP[aspectRatio]
+      const currentSize = value.size as Partial<typeof size> | undefined
+
+      if (currentSize?.width === size.width && currentSize.height === size.height) {
+        return
+      }
+
+      value.size = { ...size }
+
+      await agentStore.upsertWorkspaceFile(
+        projectId,
+        [...agentStore.workspaceFiles],
+        file.path,
+        `${JSON.stringify(value, null, 2)}\n`,
+        false,
+      )
+    } catch {
+      const size = manifest.value?.size
+      const persistedAspectRatio = size
+        ? findAspectRatioForSize(size.width, size.height)
+        : undefined
+
+      if (persistedAspectRatio) {
+        selectedAspectRatioState.value = persistedAspectRatio
+      }
+    }
+  }
+
   function selectSlide(page: number) {
     const slideCount = manifest.value?.slides.length ?? 0
 
@@ -153,4 +220,12 @@ function normalizePath(path: string): string {
   }
 
   return parts.join('/')
+}
+
+function findAspectRatioForSize(width: number, height: number): PreviewAspectRatio | undefined {
+  const exactMatch = Object.entries(PREVIEW_CANVAS_SIZE_MAP).find(
+    ([, size]) => size.width === width && size.height === height,
+  )
+
+  return exactMatch?.[0] as PreviewAspectRatio | undefined
 }

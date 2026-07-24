@@ -2,7 +2,10 @@
   <section class="live-preview">
     <header class="live-preview__header">
       <div class="live-preview__actions">
-        <PreviewAspectRatioSelect v-model="presentationStore.selectedAspectRatio" />
+        <PreviewAspectRatioSelect
+          v-model="presentationStore.selectedAspectRatio"
+          :canvas-size="presentationStore.selectedCanvasSize"
+        />
         <UiButton
           :aria-label="
             isPreviewFullscreen

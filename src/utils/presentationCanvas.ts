@@ -4,6 +4,7 @@ export interface PreviewCanvasSize {
 }
 
 export type PreviewAspectRatio = '16-9' | '21-9' | '9-16' | '4-3' | '3-4'
+export type PreviewAspectRatioSelection = PreviewAspectRatio | 'custom'
 
 export const PREVIEW_CANVAS_SIZE_MAP: Record<PreviewAspectRatio, PreviewCanvasSize> = {
   '16-9': { width: 1920, height: 1080 },
