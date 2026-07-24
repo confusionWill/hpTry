@@ -12,22 +12,20 @@
             <Settings :size="17" />
           </template>
         </UiButton>
-        <UiSelect
-          v-model="selectedProjectId"
-          class="project-select"
-          :options="projectOptions"
-          :placeholder="t('project.selectPlaceholder')"
-          @change="handleProjectChange"
-        />
-        <UiButton
-          :aria-label="t('project.create')"
-          circle
-          @click="projectDialogVisible = true"
+        <button
+          :aria-label="t('project.openManager')"
+          class="project-entry"
+          type="button"
+          @click="projectManagerVisible = true"
         >
-          <template #icon>
-            <Plus :size="17" />
-          </template>
-        </UiButton>
+          <span class="project-entry__icon" aria-hidden="true">
+            <FolderKanban :size="17" />
+          </span>
+          <span class="project-entry__name">
+            {{ store.selectedProject?.name ?? t('project.manage') }}
+          </span>
+          <ChevronsUpDown :size="15" aria-hidden="true" />
+        </button>
       </div>
     </div>
 
@@ -116,65 +114,46 @@
               </UiButton>
             </template>
             <template v-else>
-              <UiButton
-                :aria-label="t('common.edit')"
-                text
-                @click="startEditingConversation(conversation.id, conversation.title)"
-              >
-                <template #icon>
-                  <Pencil :size="16" />
-                </template>
-              </UiButton>
-              <UiButton
-                :aria-label="t('common.delete')"
-                :disabled="store.isConversationRunning(conversation.id)"
-                text
-                @click="confirmDeleteConversation(conversation.id)"
-              >
-                <template #icon>
-                  <Trash2 :size="16" />
-                </template>
-              </UiButton>
+              <UiMoreMenu
+                :items="conversationMenuItems(conversation.id)"
+                :trigger-label="
+                  t('conversation.actionsAriaLabel', { title: conversation.title })
+                "
+                @select="
+                  handleConversationAction(conversation.id, conversation.title, $event)
+                "
+              />
             </template>
           </div>
         </div>
       </div>
     </div>
 
-    <UiDialog
-      v-model="projectDialogVisible"
-      :title="t('project.create')"
-      width="420px"
-    >
-      <form @submit.prevent="createProject">
-        <UiFormItem :label="t('common.name')" required>
-          <UiInput v-model="projectForm.name" :placeholder="t('project.namePlaceholder')" />
-        </UiFormItem>
-      </form>
-      <template #footer>
-        <UiButton @click="projectDialogVisible = false">
-          {{ t('common.cancel') }}
-        </UiButton>
-        <UiButton :disabled="!projectForm.name.trim()" variant="primary" @click="createProject">
-          {{ t('common.create') }}
-        </UiButton>
-      </template>
-    </UiDialog>
+    <ProjectManager v-model="projectManagerVisible" />
   </aside>
 </template>
 
 <script setup lang="ts">
-import { Check, MessageCircle, Pencil, Plus, Settings, Trash2, X } from '@lucide/vue'
-import { computed, reactive, ref } from 'vue'
+import {
+  Check,
+  ChevronsUpDown,
+  FolderKanban,
+  MessageCircle,
+  Pencil,
+  Plus,
+  Settings,
+  Trash2,
+  X,
+} from '@lucide/vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
-import UiDialog from '@/components/ui/UiDialog.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
-import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
-import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import UiMoreMenu, { type UiMoreMenuItem } from '@/components/ui/UiMoreMenu.vue'
 import PresentationSlideSidebar from '@/components/PresentationSlideSidebar.vue'
+import ProjectManager from '@/components/ProjectManager.vue'
 import { useAgentStore } from '@/stores/agent'
 import { usePresentationStore } from '@/stores/presentation'
 import { useUiStore } from '@/stores/ui'
@@ -188,40 +167,36 @@ const presentationStore = usePresentationStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
 
-const projectDialogVisible = ref(false)
+const projectManagerVisible = ref(false)
 const editingConversationId = ref('')
 const editingConversationTitle = ref('')
-const projectForm = reactive({
-  name: '',
-})
 
-const projectOptions = computed<UiSelectOption[]>(() =>
-  store.projects.map((project) => ({
-    label: store.isProjectRunning(project.id)
-      ? `${project.name} · ${t('project.running')}`
-      : project.name,
-    value: project.id,
-  })),
-)
-
-const selectedProjectId = computed({
-  get: () => store.selectedProjectId,
-  set: (value: string) => {
-    store.selectedProjectId = value
-  },
-})
-
-async function handleProjectChange(projectId: string) {
-  await store.selectProject(projectId)
+function conversationMenuItems(conversationId: string): UiMoreMenuItem[] {
+  return [
+    {
+      key: 'rename',
+      label: t('common.rename'),
+      icon: Pencil,
+    },
+    {
+      key: 'delete',
+      label: t('common.delete'),
+      icon: Trash2,
+      danger: true,
+      disabled: store.isConversationRunning(conversationId),
+    },
+  ]
 }
 
-async function createProject() {
-  await store.createProject({
-    name: projectForm.name,
-    description: '',
-  })
-  projectForm.name = ''
-  projectDialogVisible.value = false
+function handleConversationAction(conversationId: string, title: string, action: string) {
+  if (action === 'rename') {
+    startEditingConversation(conversationId, title)
+    return
+  }
+
+  if (action === 'delete') {
+    void confirmDeleteConversation(conversationId)
+  }
 }
 
 function startEditingConversation(conversationId: string, title: string) {
@@ -288,15 +263,61 @@ async function confirmDeleteConversation(conversationId: string) {
   min-width: 0;
 }
 
-.project-select {
-  min-width: 0;
-  flex: 1;
-}
-
 .project-picker {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.project-entry {
+  display: grid;
+  min-width: 0;
+  min-height: 38px;
+  flex: 1;
+  align-items: center;
+  border: 0;
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, var(--ui-color-primary-light-9), var(--ui-bg-color));
+  box-shadow: inset 0 0 0 1px var(--ui-color-primary-light-7);
+  color: var(--ui-text-color-primary);
+  cursor: pointer;
+  font: inherit;
+  gap: 8px;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  padding: 7px 10px;
+  text-align: left;
+  transition:
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.project-entry:hover {
+  box-shadow:
+    inset 0 0 0 1px var(--ui-color-primary-light-5),
+    0 5px 14px rgb(15 23 42 / 8%);
+  transform: translateY(-1px);
+}
+
+.project-entry:focus-visible {
+  outline: 2px solid var(--ui-color-primary-light-5);
+  outline-offset: 2px;
+}
+
+.project-entry__icon {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--ui-bg-color);
+  color: var(--ui-color-primary);
+}
+
+.project-entry__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .conversation-actions {
@@ -376,7 +397,6 @@ async function confirmDeleteConversation(conversationId: string) {
   width: 100%;
   min-height: 40px;
   align-items: center;
-  border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
   color: var(--ui-text-color-primary);
@@ -411,6 +431,18 @@ async function confirmDeleteConversation(conversationId: string) {
 .conversation-item__actions {
   display: flex;
   align-items: center;
+}
+
+.conversation-item__actions > .ui-more-menu {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.conversation-item:hover .conversation-item__actions > .ui-more-menu,
+.conversation-item:focus-within .conversation-item__actions > .ui-more-menu {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .conversation-item:hover,

@@ -130,7 +130,7 @@ watch(
   margin: 0;
   color: var(--ui-text-color-primary);
   font-size: 16px;
-  font-weight: 650;
+  font-weight: normal;
 }
 
 .ui-dialog__body {

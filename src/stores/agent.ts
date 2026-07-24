@@ -354,6 +354,25 @@ export const useAgentStore = defineStore('agent', {
       this.projects = sortUpdated([...this.projects, project])
       await this.selectProject(project.id, true)
     },
+    async renameProject(projectId: string, name: string) {
+      const project = this.projects.find((item) => item.id === projectId)
+      const trimmedName = name.trim()
+
+      if (!project || !trimmedName || project.name === trimmedName) {
+        return
+      }
+
+      const updatedProject: Project = {
+        ...project,
+        name: trimmedName,
+        updatedAt: now(),
+      }
+
+      await putRecord('projects', updatedProject)
+      this.projects = sortUpdated(
+        this.projects.map((item) => (item.id === projectId ? updatedProject : item)),
+      )
+    },
     async deleteProject(projectId: string) {
       if (this.isProjectRunning(projectId)) {
         throw new Error('Cannot delete a project while its agent is running')
@@ -373,12 +392,20 @@ export const useAgentStore = defineStore('agent', {
       await deleteRecord('projects', projectId)
 
       this.projects = this.projects.filter((project) => project.id !== projectId)
-      this.selectedProjectId = this.projects[0]?.id ?? ''
-      saveSelectedProjectId(this.selectedProjectId)
 
-      if (this.selectedProjectId) {
-        await this.selectProject(this.selectedProjectId)
+      if (this.selectedProjectId !== projectId) {
+        return
+      }
+
+      const nextProjectId = this.projects[0]?.id ?? ''
+
+      if (nextProjectId) {
+        await this.selectProject(nextProjectId)
       } else {
+        this.projectLoadToken += 1
+        this.conversationLoadToken += 1
+        this.selectedProjectId = ''
+        saveSelectedProjectId('')
         this.conversations = []
         this.turns = []
         this.events = []

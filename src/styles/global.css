@@ -4,8 +4,8 @@
 
 :root {
   --ui-color-white: #ffffff;
-  --ui-color-primary: #2563eb;
-  --ui-color-primary-dark-2: #1d4ed8;
+  --ui-color-primary: #139be9;
+  --ui-color-primary-dark-2: #139be9;
   --ui-color-primary-light-5: #93c5fd;
   --ui-color-primary-light-7: #bfdbfe;
   --ui-color-primary-light-9: #eff6ff;
@@ -65,6 +65,7 @@ body,
   width: 100%;
   height: 100%;
   margin: 0;
+  font-size: 14px;
 }
 
 body {

@@ -441,6 +441,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   flex: 1;
   flex-direction: column;
   background: var(--ui-background2);
+  border-left: 1px solid #eee;
 }
 
 .chat-panel__header {

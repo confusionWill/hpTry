@@ -181,8 +181,9 @@ function thumbnailUrl(page: number): string {
 .slide-sidebar__thumbnail {
   position: relative;
   display: block;
-  width: 100%;
+  width: calc(100% - 4px);
   overflow: hidden;
+  box-sizing: content-box;
   border: 2px solid transparent;
   border-radius: 5px;
   background: #ffffff;
@@ -192,16 +193,16 @@ function thumbnailUrl(page: number): string {
     box-shadow 160ms ease;
 }
 
-.slide-sidebar__item:hover .slide-sidebar__thumbnail {
-  border-color: var(--ui-color-primary-light-5);
-}
-
 .slide-sidebar__item--active {
   color: var(--ui-color-primary);
 }
 
+.slide-sidebar__item:hover .slide-sidebar__thumbnail,
 .slide-sidebar__item--active .slide-sidebar__thumbnail {
-  border-color: var(--ui-color-primary);
+  border-color: var(--ui-color-primary-light-5);
+}
+
+.slide-sidebar__item--active .slide-sidebar__thumbnail {
   box-shadow: 0 0 0 1px var(--ui-color-primary-light-7);
 }
 

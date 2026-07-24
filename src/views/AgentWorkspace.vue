@@ -90,6 +90,7 @@ watch(
   min-height: 0;
   grid-template-rows: minmax(0, 1fr);
   background: var(--ui-background2);
+  border-right: 1px solid #eee;
 }
 
 .workspace__preview {
