@@ -119,7 +119,7 @@
                     <span
                       class="message-avatar message-avatar--assistant message-avatar--assistant-meta"
                       :class="{
-                        'message-avatar--assistant-loading': isLoadingAssistantBubble(bubble.id),
+                        'message-avatar--assistant-loading': isLoadingAssistantBubble(bubble),
                       }"
                       :style="avatarTransitionStyle(bubble.id)"
                       aria-hidden="true"
@@ -227,6 +227,7 @@ type ConversationBubble =
   | {
       id: string
       type: 'assistant'
+      turnId: string
       tools: ConversationToolEvent[]
       message?: ConversationMessageEvent
     }
@@ -291,6 +292,7 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
       currentAssistantBubble = {
         id: `assistant:${event.turnId}:${currentAssistantGroupIndex}`,
         type: 'assistant',
+        turnId: event.turnId,
         tools: [],
       }
       currentAssistantGroupIndex += 1
@@ -312,23 +314,24 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
     bubbles.push({
       id: `assistant:${lastBubble.message.turnId}:0`,
       type: 'assistant',
+      turnId: lastBubble.message.turnId,
       tools: [],
     })
   }
 
   return bubbles
 })
-const collapsedConversationBubbles = computed(() =>
-  conversationBubbles.value.slice(-MAX_COLLAPSED_AVATARS),
-)
-const runningTurnTools = computed<ConversationToolEvent[]>(() => {
-  const runningTurn = [...store.turns]
+const selectedRunningTurn = computed(() =>
+  [...store.turns]
     .reverse()
     .find(
       (turn) =>
         turn.status === 'running' &&
         turn.conversationId === store.selectedConversationId,
-    )
+    ),
+)
+const runningTurnTools = computed<ConversationToolEvent[]>(() => {
+  const runningTurn = selectedRunningTurn.value
 
   if (!runningTurn) {
     return []
@@ -348,15 +351,34 @@ const showCollapsedAgentActivity = computed(
 )
 const showStandalonePacman = computed(
   () => {
-    const lastBubble = collapsedConversationBubbles.value.at(-1)
+    const lastBubble = conversationBubbles.value.at(-1)
+    const runningTurn = selectedRunningTurn.value
+    const hasToolAnimations =
+      pendingToolAnimations.value.length > 0 || activeToolAnimations.value.length > 0
+
+    if (!showCollapsedAgentActivity.value) {
+      return false
+    }
+
+    if (!lastBubble) {
+      return true
+    }
+
+    if (runningTurn) {
+      return lastBubble.type !== 'assistant' || lastBubble.turnId !== runningTurn.id
+    }
 
     return (
-      showCollapsedAgentActivity.value &&
-      lastBubble !== undefined &&
-      lastBubble.type !== 'assistant'
+      store.isSelectedConversationRunning ||
+      (hasToolAnimations && lastBubble.type !== 'assistant')
     )
   },
 )
+const collapsedConversationBubbles = computed(() => {
+  const bubbleLimit = MAX_COLLAPSED_AVATARS - (showStandalonePacman.value ? 1 : 0)
+
+  return conversationBubbles.value.slice(-bubbleLimit)
+})
 const collapsedAvatarCount = computed(
   () => collapsedConversationBubbles.value.length + (showStandalonePacman.value ? 1 : 0),
 )
@@ -386,22 +408,34 @@ function toggleToolGroup(bubbleId: string) {
   }
 }
 
-function isLoadingAssistantBubble(bubbleId: string): boolean {
+function isLoadingAssistantBubble(
+  bubble: Extract<ConversationBubble, { type: 'assistant' }>,
+): boolean {
+  const runningTurn = selectedRunningTurn.value
   const lastBubble = conversationBubbles.value.at(-1)
 
   return (
     store.isSelectedConversationRunning &&
-    lastBubble?.type === 'assistant' &&
-    lastBubble.id === bubbleId
+    runningTurn !== undefined &&
+    bubble.turnId === runningTurn.id &&
+    lastBubble?.id === bubble.id
   )
 }
 
 function isCollapsedPacmanBubble(bubble: ConversationBubble, index: number): boolean {
-  return (
-    showCollapsedAgentActivity.value &&
-    bubble.type === 'assistant' &&
-    index === collapsedConversationBubbles.value.length - 1
-  )
+  if (
+    !showCollapsedAgentActivity.value ||
+    bubble.type !== 'assistant' ||
+    index !== collapsedConversationBubbles.value.length - 1
+  ) {
+    return false
+  }
+
+  if (selectedRunningTurn.value) {
+    return bubble.turnId === selectedRunningTurn.value.id
+  }
+
+  return pendingToolAnimations.value.length > 0 || activeToolAnimations.value.length > 0
 }
 
 function handleMessagesScroll() {
@@ -1094,7 +1128,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   }
 
   .chat-panel__floating-tool {
-    animation: none;
+    animation-duration: 1ms;
   }
 
   .message-avatar--pacman {
@@ -1116,11 +1150,6 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 
   .message-avatar__pacman-half--bottom {
     transform: rotate(22deg);
-  }
-
-  .chat-panel__floating-tool:last-child {
-    top: calc(50% + var(--last-avatar-offset) + 40px);
-    opacity: 0.65;
   }
 }
 
