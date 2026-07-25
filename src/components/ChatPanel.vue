@@ -38,17 +38,11 @@
             v-for="(bubble, index) in collapsedConversationBubbles"
             :key="bubble.id"
             class="message-avatar"
-            :class="[
+            :class="
               isCollapsedPacmanBubble(bubble, index)
                 ? 'message-avatar--pacman'
-                : `message-avatar--${bubble.type}`,
-              {
-                'message-avatar--activity-entering':
-                  isCollapsedPacmanBubble(bubble, index) &&
-                  bubble.type === 'assistant' &&
-                  bubble.pending,
-              },
-            ]"
+                : `message-avatar--${bubble.type}`
+            "
             :style="avatarTransitionStyle(bubble.id)"
             aria-hidden="true"
           >
@@ -235,7 +229,6 @@ type ConversationBubble =
       type: 'assistant'
       tools: ConversationToolEvent[]
       message?: ConversationMessageEvent
-      pending?: boolean
     }
 
 interface ToolAnimationItem {
@@ -268,6 +261,7 @@ let lastToolLaunchAt = 0
 let nextToolLane = 0
 
 const TOOL_LAUNCH_GAP_MS = 300
+const MAX_COLLAPSED_AVATARS = 8
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const conversationBubbles = computed<ConversationBubble[]>(() => {
@@ -319,13 +313,14 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
       id: `assistant:${lastBubble.message.turnId}:0`,
       type: 'assistant',
       tools: [],
-      pending: true,
     })
   }
 
   return bubbles
 })
-const collapsedConversationBubbles = computed(() => conversationBubbles.value.slice(-8))
+const collapsedConversationBubbles = computed(() =>
+  conversationBubbles.value.slice(-MAX_COLLAPSED_AVATARS),
+)
 const runningTurnTools = computed<ConversationToolEvent[]>(() => {
   const runningTurn = [...store.turns]
     .reverse()
@@ -352,9 +347,15 @@ const showCollapsedAgentActivity = computed(
     activeToolAnimations.value.length > 0,
 )
 const showStandalonePacman = computed(
-  () =>
-    showCollapsedAgentActivity.value &&
-    collapsedConversationBubbles.value.at(-1)?.type !== 'assistant',
+  () => {
+    const lastBubble = collapsedConversationBubbles.value.at(-1)
+
+    return (
+      showCollapsedAgentActivity.value &&
+      lastBubble !== undefined &&
+      lastBubble.type !== 'assistant'
+    )
+  },
 )
 const collapsedAvatarCount = computed(
   () => collapsedConversationBubbles.value.length + (showStandalonePacman.value ? 1 : 0),
@@ -757,20 +758,43 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   flex: 1;
   flex-direction: column;
   justify-content: safe center;
-  overflow-x: hidden;
-  overflow-y: auto;
+  overflow: hidden;
   padding: 18px;
 }
 
 .chat-panel__avatar-stack {
+  position: relative;
   display: flex;
+  width: 28px;
   align-items: center;
   flex-direction: column;
   gap: 12px;
 }
 
+.collapsed-avatar-enter-active,
+.collapsed-avatar-leave-active,
 .collapsed-avatar-move {
-  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 260ms ease,
+    scale 260ms ease,
+    translate 420ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.collapsed-avatar-enter-from {
+  opacity: 0;
+  scale: 0.72;
+  translate: 0 40px;
+}
+
+.collapsed-avatar-leave-to {
+  opacity: 0;
+  scale: 0.72;
+  translate: 0 -40px;
+}
+
+.collapsed-avatar-leave-active {
+  position: absolute;
 }
 
 .chat-panel__avatar-list,
@@ -874,55 +898,6 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   background: transparent;
   filter: drop-shadow(0 4px 7px rgb(34 197 94 / 22%));
   transform: rotate(90deg);
-}
-
-.message-avatar--activity-entering {
-  animation: collapsed-avatar-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-.message-avatar--activity-entering::after {
-  position: absolute;
-  border: 2px solid rgb(34 197 94 / 55%);
-  border-radius: 50%;
-  content: '';
-  inset: -3px;
-  opacity: 0;
-  pointer-events: none;
-  transform: scale(0.65);
-  animation: collapsed-avatar-entry-halo 480ms ease-out both;
-}
-
-@keyframes collapsed-avatar-enter {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) rotate(90deg) scale(0.55);
-  }
-
-  62% {
-    opacity: 1;
-    transform: translateY(0) rotate(90deg) scale(1.15);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0) rotate(90deg) scale(1);
-  }
-}
-
-@keyframes collapsed-avatar-entry-halo {
-  0% {
-    opacity: 0;
-    transform: scale(0.65);
-  }
-
-  28% {
-    opacity: 0.55;
-  }
-
-  100% {
-    opacity: 0;
-    transform: scale(1.45);
-  }
 }
 
 .message-avatar__pacman-half {
@@ -1112,6 +1087,8 @@ function toolEventLabel(tool: ConversationToolEvent): string {
     animation: none;
   }
 
+  .collapsed-avatar-enter-active,
+  .collapsed-avatar-leave-active,
   .collapsed-avatar-move {
     transition: none;
   }
@@ -1122,11 +1099,6 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 
   .message-avatar--pacman {
     transform: rotate(90deg);
-  }
-
-  .message-avatar--activity-entering,
-  .message-avatar--activity-entering::after {
-    animation: none;
   }
 
   .message-avatar__pacman-half {
