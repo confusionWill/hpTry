@@ -42,6 +42,8 @@
     "title": "会话",
     "new": "新建会话",
     "actionsAriaLabel": "会话 {title} 的更多操作",
+    "renameAriaLabel": "重命名会话 {title}",
+    "renameFailed": "重命名会话失败",
     "namePlaceholder": "会话标题",
     "empty": "暂无会话",
     "selectEmpty": "选择或创建一个会话",

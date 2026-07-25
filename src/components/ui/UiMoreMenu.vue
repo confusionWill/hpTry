@@ -65,6 +65,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   select: [key: string]
+  'update:open': [value: boolean]
 }>()
 
 const menuWidth = 128
@@ -72,7 +73,12 @@ const open = ref(false)
 const position = ref({ left: 0, top: 0 })
 
 function closeMenu() {
+  if (!open.value) {
+    return
+  }
+
   open.value = false
+  emit('update:open', false)
 
   if (closeActiveMenu === closeMenu) {
     closeActiveMenu = null
@@ -104,6 +110,7 @@ function toggleMenu(event: MouseEvent) {
   closeActiveMenu?.()
   closeActiveMenu = closeMenu
   open.value = true
+  emit('update:open', true)
 }
 
 function selectItem(item: UiMoreMenuItem) {

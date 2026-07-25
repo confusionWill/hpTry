@@ -38,7 +38,12 @@
       @select="presentationStore.selectSlide"
     />
 
-    <div class="section conversations">
+    <div
+      class="section conversations"
+      :class="{
+        'conversations--interacting': conversationMenuOpen || editingConversationId,
+      }"
+    >
       <div class="conversation-actions">
         <UiButton
           :aria-label="t('conversation.new')"
@@ -76,55 +81,44 @@
           class="conversation-item"
           :class="{ 'conversation-item--active': conversation.id === store.selectedConversationId }"
         >
-          <UiInput
+          <div
             v-if="editingConversationId === conversation.id"
-            v-model="editingConversationTitle"
-            class="conversation-item__input"
-            :placeholder="t('conversation.namePlaceholder')"
-            @keydown.enter.exact.prevent="saveConversationTitle(conversation.id)"
-            @keydown.esc.prevent="cancelEditingConversation"
-          />
-          <button
-            v-else
-            class="conversation-item__select"
-            type="button"
-            @click="store.selectConversation(conversation.id)"
+            class="conversation-item__edit"
           >
-            <span>{{ conversation.title }}</span>
-          </button>
-          <div class="conversation-item__actions">
-            <template v-if="editingConversationId === conversation.id">
-              <UiButton
-                :aria-label="t('common.save')"
-                text
-                @click="saveConversationTitle(conversation.id)"
-              >
-                <template #icon>
-                  <Check :size="16" />
-                </template>
-              </UiButton>
-              <UiButton
-                :aria-label="t('common.cancel')"
-                text
-                @click="cancelEditingConversation"
-              >
-                <template #icon>
-                  <X :size="16" />
-                </template>
-              </UiButton>
-            </template>
-            <template v-else>
+            <input
+              :ref="setRenameInput"
+              v-model="editingConversationTitle"
+              :aria-label="
+                t('conversation.renameAriaLabel', { title: conversation.title })
+              "
+              class="conversation-item__rename-input"
+              type="text"
+              @blur="saveConversationTitle(conversation.id)"
+              @keydown.enter.exact.prevent="saveConversationTitle(conversation.id)"
+              @keydown.esc.prevent="cancelEditingConversation"
+            />
+          </div>
+          <template v-else>
+            <button
+              class="conversation-item__select"
+              type="button"
+              @click="store.selectConversation(conversation.id)"
+            >
+              <span>{{ conversation.title }}</span>
+            </button>
+            <div class="conversation-item__actions">
               <UiMoreMenu
                 :items="conversationMenuItems(conversation.id)"
                 :trigger-label="
                   t('conversation.actionsAriaLabel', { title: conversation.title })
                 "
+                @update:open="conversationMenuOpen = $event"
                 @select="
                   handleConversationAction(conversation.id, conversation.title, $event)
                 "
               />
-            </template>
-          </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -135,7 +129,6 @@
 
 <script setup lang="ts">
 import {
-  Check,
   ChevronsUpDown,
   FolderKanban,
   MessageCircle,
@@ -143,14 +136,12 @@ import {
   Plus,
   Settings,
   Trash2,
-  X,
 } from '@lucide/vue'
-import { ref } from 'vue'
+import { nextTick, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
-import UiInput from '@/components/ui/UiInput.vue'
 import UiMoreMenu, { type UiMoreMenuItem } from '@/components/ui/UiMoreMenu.vue'
 import PresentationSlideSidebar from '@/components/PresentationSlideSidebar.vue'
 import ProjectManager from '@/components/ProjectManager.vue'
@@ -170,6 +161,8 @@ const { t } = useI18n()
 const projectManagerVisible = ref(false)
 const editingConversationId = ref('')
 const editingConversationTitle = ref('')
+const renameInput = ref<HTMLInputElement | null>(null)
+const conversationMenuOpen = ref(false)
 
 function conversationMenuItems(conversationId: string): UiMoreMenuItem[] {
   return [
@@ -190,7 +183,7 @@ function conversationMenuItems(conversationId: string): UiMoreMenuItem[] {
 
 function handleConversationAction(conversationId: string, title: string, action: string) {
   if (action === 'rename') {
-    startEditingConversation(conversationId, title)
+    void startEditingConversation(conversationId, title)
     return
   }
 
@@ -199,9 +192,16 @@ function handleConversationAction(conversationId: string, title: string, action:
   }
 }
 
-function startEditingConversation(conversationId: string, title: string) {
+function setRenameInput(element: unknown) {
+  renameInput.value = element instanceof HTMLInputElement ? element : null
+}
+
+async function startEditingConversation(conversationId: string, title: string) {
   editingConversationId.value = conversationId
   editingConversationTitle.value = title
+  await nextTick()
+  renameInput.value?.focus()
+  renameInput.value?.select()
 }
 
 function cancelEditingConversation() {
@@ -210,12 +210,26 @@ function cancelEditingConversation() {
 }
 
 async function saveConversationTitle(conversationId: string) {
-  if (!editingConversationTitle.value.trim()) {
+  if (editingConversationId.value !== conversationId) {
     return
   }
 
-  await store.updateConversationTitle(conversationId, editingConversationTitle.value)
+  const title = editingConversationTitle.value.trim()
+
+  if (!title) {
+    cancelEditingConversation()
+    return
+  }
+
   cancelEditingConversation()
+
+  try {
+    await store.updateConversationTitle(conversationId, title)
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : t('conversation.renameFailed')
+    uiStore.showToast(message || t('conversation.renameFailed'), 'error')
+  }
 }
 
 async function confirmDeleteConversation(conversationId: string) {
@@ -373,13 +387,15 @@ async function confirmDeleteConversation(conversationId: string) {
 }
 
 .conversations:hover,
-.conversations:focus-within {
+.conversations:focus-within,
+.conversations--interacting {
   box-shadow: 14px 0 36px rgb(15 23 42 / 18%);
   transform: translateX(0);
 }
 
 .conversations:hover::after,
-.conversations:focus-within::after {
+.conversations:focus-within::after,
+.conversations--interacting::after {
   background: var(--ui-color-primary-light-5);
 }
 
@@ -405,8 +421,28 @@ async function confirmDeleteConversation(conversationId: string) {
   text-align: left;
 }
 
-.conversation-item__input {
+.conversation-item__edit {
+  display: flex;
   min-width: 0;
+  grid-column: 1 / -1;
+  padding: 0 6px;
+}
+
+.conversation-item__rename-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  border: 1px solid var(--ui-color-primary);
+  border-radius: 7px;
+  background: var(--ui-bg-color);
+  color: var(--ui-text-color-primary);
+  font: inherit;
+  padding: 7px 10px;
+}
+
+.conversation-item__rename-input:focus {
+  outline: 2px solid var(--ui-color-primary-light-7);
+  outline-offset: 1px;
 }
 
 .conversation-item__select {

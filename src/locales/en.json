@@ -42,6 +42,8 @@
     "title": "Conversations",
     "new": "New conversation",
     "actionsAriaLabel": "More actions for conversation {title}",
+    "renameAriaLabel": "Rename conversation {title}",
+    "renameFailed": "Failed to rename conversation",
     "namePlaceholder": "Conversation title",
     "empty": "No conversations",
     "selectEmpty": "Select or create a conversation",
