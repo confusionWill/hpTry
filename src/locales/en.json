@@ -55,7 +55,7 @@
     "stop": "Stop",
     "stopping": "Stopping",
     "agentRunning": "Agent is running and using tools",
-    "agentActivityPreview": "Preview of the Agent consuming tools",
+    "finishingToolAnimation": "Finishing tool activity animation",
     "stopped": "Generation stopped.",
     "loadingOlder": "Loading earlier messages…",
     "upload": {

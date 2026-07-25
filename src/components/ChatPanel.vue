@@ -26,51 +26,70 @@
         v-show="collapsed"
         class="chat-panel__avatar-list"
         :style="{
-          '--last-avatar-offset': `${Math.max(collapsedConversationBubbles.length, 1) * 20 - 30}px`,
+          '--last-avatar-offset': `${Math.max(collapsedAvatarCount, 1) * 20 - 30}px`,
         }"
       >
-        <span
-          v-for="(bubble, index) in collapsedConversationBubbles"
-          :key="bubble.id"
-          class="message-avatar"
-          :class="
-            index === collapsedConversationBubbles.length - 1
-              ? 'message-avatar--pacman'
-              : `message-avatar--${bubble.type}`
-          "
-          :style="avatarTransitionStyle(bubble.id)"
-          aria-hidden="true"
+        <TransitionGroup
+          name="collapsed-avatar"
+          tag="div"
+          class="chat-panel__avatar-stack"
         >
-          <template
-            v-if="index === collapsedConversationBubbles.length - 1"
+          <span
+            v-for="(bubble, index) in collapsedConversationBubbles"
+            :key="bubble.id"
+            class="message-avatar"
+            :class="[
+              isCollapsedPacmanBubble(bubble, index)
+                ? 'message-avatar--pacman'
+                : `message-avatar--${bubble.type}`,
+              {
+                'message-avatar--activity-entering':
+                  isCollapsedPacmanBubble(bubble, index) &&
+                  bubble.type === 'assistant' &&
+                  bubble.pending,
+              },
+            ]"
+            :style="avatarTransitionStyle(bubble.id)"
+            aria-hidden="true"
+          >
+            <template v-if="isCollapsedPacmanBubble(bubble, index)">
+              <span class="message-avatar__pacman-half message-avatar__pacman-half--top" />
+              <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
+            </template>
+          </span>
+
+          <span
+            v-if="showStandalonePacman"
+            key="standalone-pacman"
+            class="message-avatar message-avatar--pacman"
+            aria-hidden="true"
           >
             <span class="message-avatar__pacman-half message-avatar__pacman-half--top" />
             <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
-          </template>
-        </span>
-
-        <span
-          v-if="collapsedConversationBubbles.length === 0"
-          class="message-avatar message-avatar--pacman"
-          aria-hidden="true"
-        >
-          <span class="message-avatar__pacman-half message-avatar__pacman-half--top" />
-          <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
-        </span>
+          </span>
+        </TransitionGroup>
 
         <div
+          v-if="showCollapsedAgentActivity"
           class="chat-panel__tool-stream"
           role="status"
-          :aria-label="t('conversation.agentActivityPreview')"
+          :aria-label="
+            t(
+              store.isSelectedConversationRunning
+                ? 'conversation.agentRunning'
+                : 'conversation.finishingToolAnimation',
+            )
+          "
         >
           <span
-            v-for="(toolName, index) in previewToolNames"
-            :key="toolName"
+            v-for="tool in activeToolAnimations"
+            :key="tool.event.id"
             class="chat-panel__floating-tool"
-            :style="toolAnimationStyle(index)"
+            :style="toolAnimationStyle(tool.lane)"
             aria-hidden="true"
+            @animationend.self="handleToolAnimationEnd(tool.event.id)"
           >
-            <ToolEventIcon :tool-name="toolName" status="success" />
+            <ToolEventIcon :tool-name="tool.event.toolName" :status="tool.event.status" />
           </span>
         </div>
       </div>
@@ -105,6 +124,9 @@
                   <div class="message__assistant-meta">
                     <span
                       class="message-avatar message-avatar--assistant message-avatar--assistant-meta"
+                      :class="{
+                        'message-avatar--assistant-loading': isLoadingAssistantBubble(bubble.id),
+                      }"
                       :style="avatarTransitionStyle(bubble.id)"
                       aria-hidden="true"
                     />
@@ -190,7 +212,7 @@
 
 <script setup lang="ts">
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
@@ -213,7 +235,13 @@ type ConversationBubble =
       type: 'assistant'
       tools: ConversationToolEvent[]
       message?: ConversationMessageEvent
+      pending?: boolean
     }
+
+interface ToolAnimationItem {
+  event: ConversationToolEvent
+  lane: number
+}
 
 const props = defineProps<{
   collapsed: boolean
@@ -232,17 +260,27 @@ const lastMessagesScrollTop = ref(0)
 const selectedToolId = ref('')
 const toolDetailVisible = ref(false)
 const expandedToolGroups = ref<Record<string, boolean>>({})
+const pendingToolAnimations = ref<ToolAnimationItem[]>([])
+const activeToolAnimations = ref<ToolAnimationItem[]>([])
+const observedToolIds = new Set<string>()
+let toolLaunchTimer: ReturnType<typeof setTimeout> | undefined
+let lastToolLaunchAt = 0
+let nextToolLane = 0
+
+const TOOL_LAUNCH_GAP_MS = 300
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
 const conversationBubbles = computed<ConversationBubble[]>(() => {
   const bubbles: ConversationBubble[] = []
   let currentAssistantBubble: Extract<ConversationBubble, { type: 'assistant' }> | undefined
+  let currentAssistantGroupIndex = 0
   let currentTurnId = ''
 
   for (const event of store.events) {
     if (event.turnId !== currentTurnId) {
       currentTurnId = event.turnId
       currentAssistantBubble = undefined
+      currentAssistantGroupIndex = 0
     }
 
     if (event.type === 'message' && event.role === 'user') {
@@ -257,10 +295,11 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
 
     if (!currentAssistantBubble) {
       currentAssistantBubble = {
-        id: `assistant:${event.id}`,
+        id: `assistant:${event.turnId}:${currentAssistantGroupIndex}`,
         type: 'assistant',
         tools: [],
       }
+      currentAssistantGroupIndex += 1
       bubbles.push(currentAssistantBubble)
     }
 
@@ -273,15 +312,53 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
     currentAssistantBubble = undefined
   }
 
+  const lastBubble = bubbles.at(-1)
+
+  if (store.isSelectedConversationRunning && lastBubble?.type === 'user') {
+    bubbles.push({
+      id: `assistant:${lastBubble.message.turnId}:0`,
+      type: 'assistant',
+      tools: [],
+      pending: true,
+    })
+  }
+
   return bubbles
 })
 const collapsedConversationBubbles = computed(() => conversationBubbles.value.slice(-8))
-const previewToolNames = [
-  'search_files',
-  'read_files',
-  'edit_file',
-  'write_file',
-] as const
+const runningTurnTools = computed<ConversationToolEvent[]>(() => {
+  const runningTurn = [...store.turns]
+    .reverse()
+    .find(
+      (turn) =>
+        turn.status === 'running' &&
+        turn.conversationId === store.selectedConversationId,
+    )
+
+  if (!runningTurn) {
+    return []
+  }
+
+  return store.events
+    .filter(
+      (event): event is ConversationToolEvent =>
+        event.type === 'tool' && event.turnId === runningTurn.id,
+    )
+})
+const showCollapsedAgentActivity = computed(
+  () =>
+    store.isSelectedConversationRunning ||
+    pendingToolAnimations.value.length > 0 ||
+    activeToolAnimations.value.length > 0,
+)
+const showStandalonePacman = computed(
+  () =>
+    showCollapsedAgentActivity.value &&
+    collapsedConversationBubbles.value.at(-1)?.type !== 'assistant',
+)
+const collapsedAvatarCount = computed(
+  () => collapsedConversationBubbles.value.length + (showStandalonePacman.value ? 1 : 0),
+)
 const transitioningBubbleIds = computed(
   () => new Set(collapsedConversationBubbles.value.map((bubble) => bubble.id)),
 )
@@ -306,6 +383,24 @@ function toggleToolGroup(bubbleId: string) {
     ...expandedToolGroups.value,
     [bubbleId]: !isToolGroupExpanded(bubbleId),
   }
+}
+
+function isLoadingAssistantBubble(bubbleId: string): boolean {
+  const lastBubble = conversationBubbles.value.at(-1)
+
+  return (
+    store.isSelectedConversationRunning &&
+    lastBubble?.type === 'assistant' &&
+    lastBubble.id === bubbleId
+  )
+}
+
+function isCollapsedPacmanBubble(bubble: ConversationBubble, index: number): boolean {
+  return (
+    showCollapsedAgentActivity.value &&
+    bubble.type === 'assistant' &&
+    index === collapsedConversationBubbles.value.length - 1
+  )
 }
 
 function handleMessagesScroll() {
@@ -399,8 +494,65 @@ watch(
   { flush: 'post' },
 )
 
+watch(
+  () => store.selectedConversationId,
+  () => {
+    resetToolAnimationPresentation()
+    observeCurrentRunningTools()
+  },
+  { flush: 'sync', immediate: true },
+)
+
+watch(
+  () => props.collapsed,
+  () => {
+    resetToolAnimationPresentation()
+    observeCurrentRunningTools()
+  },
+  { flush: 'sync' },
+)
+
+watch(
+  runningTurnTools,
+  (tools) => {
+    for (const tool of tools) {
+      const existingItem = [...pendingToolAnimations.value, ...activeToolAnimations.value].find(
+        (item) => item.event.id === tool.id,
+      )
+
+      if (existingItem) {
+        existingItem.event = tool
+        continue
+      }
+
+      if (observedToolIds.has(tool.id)) {
+        continue
+      }
+
+      observedToolIds.add(tool.id)
+
+      if (!props.collapsed || !store.isSelectedConversationRunning) {
+        continue
+      }
+
+      pendingToolAnimations.value.push({
+        event: tool,
+        lane: nextToolLane,
+      })
+      nextToolLane += 1
+    }
+
+    scheduleNextToolAnimation()
+  },
+  { deep: true },
+)
+
 onMounted(() => {
   void scrollMessagesToBottom(true)
+})
+
+onBeforeUnmount(() => {
+  clearToolLaunchTimer()
 })
 
 function isStreamingAssistantMessage(message: ConversationMessageEvent): boolean {
@@ -422,13 +574,80 @@ function avatarTransitionStyle(bubbleId: string): Record<string, string> {
   }
 }
 
-function toolAnimationStyle(index: number): Record<string, string> {
+function toolAnimationStyle(lane: number): Record<string, string> {
   const horizontalOffsets = ['-13px', '11px', '-9px', '14px']
 
   return {
-    '--tool-x': horizontalOffsets[index % horizontalOffsets.length] ?? '0px',
-    '--tool-delay': `${index * -1}s`,
+    '--tool-x': horizontalOffsets[lane % horizontalOffsets.length] ?? '0px',
   }
+}
+
+function resetToolAnimationPresentation() {
+  clearToolLaunchTimer()
+  pendingToolAnimations.value = []
+  activeToolAnimations.value = []
+  observedToolIds.clear()
+  lastToolLaunchAt = 0
+  nextToolLane = 0
+}
+
+function observeCurrentRunningTools() {
+  for (const tool of runningTurnTools.value) {
+    observedToolIds.add(tool.id)
+  }
+}
+
+function clearToolLaunchTimer() {
+  if (toolLaunchTimer === undefined) {
+    return
+  }
+
+  clearTimeout(toolLaunchTimer)
+  toolLaunchTimer = undefined
+}
+
+function launchNextToolAnimation() {
+  toolLaunchTimer = undefined
+
+  const nextTool = pendingToolAnimations.value.shift()
+
+  if (!nextTool) {
+    return
+  }
+
+  activeToolAnimations.value.push(nextTool)
+  lastToolLaunchAt = Date.now()
+  scheduleNextToolAnimation()
+}
+
+function scheduleNextToolAnimation() {
+  if (
+    !props.collapsed ||
+    toolLaunchTimer !== undefined ||
+    pendingToolAnimations.value.length === 0
+  ) {
+    return
+  }
+
+  const elapsedSinceLastLaunch = Date.now() - lastToolLaunchAt
+  const delay =
+    lastToolLaunchAt === 0
+      ? 0
+      : Math.max(0, TOOL_LAUNCH_GAP_MS - elapsedSinceLastLaunch)
+
+  if (delay === 0) {
+    launchNextToolAnimation()
+    return
+  }
+
+  toolLaunchTimer = setTimeout(launchNextToolAnimation, delay)
+}
+
+function handleToolAnimationEnd(toolId: string) {
+  activeToolAnimations.value = activeToolAnimations.value.filter(
+    (item) => item.event.id !== toolId,
+  )
+  scheduleNextToolAnimation()
 }
 
 async function toggleCollapsed() {
@@ -537,10 +756,21 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   align-items: center;
   flex: 1;
   flex-direction: column;
-  gap: 12px;
   justify-content: safe center;
+  overflow-x: hidden;
   overflow-y: auto;
   padding: 18px;
+}
+
+.chat-panel__avatar-stack {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.collapsed-avatar-move {
+  transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .chat-panel__avatar-list,
@@ -637,33 +867,81 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 .message-avatar--pacman {
   position: relative;
   z-index: 2;
-  width: 34px;
-  height: 34px;
-  flex-basis: 34px;
+  width: 28px;
+  height: 28px;
+  flex-basis: 28px;
   border-radius: 0;
   background: transparent;
   filter: drop-shadow(0 4px 7px rgb(34 197 94 / 22%));
-  animation: pacman-swallow 1s ease-out infinite;
-  transform-origin: 50% 50%;
+  transform: rotate(90deg);
+}
+
+.message-avatar--activity-entering {
+  animation: collapsed-avatar-enter 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.message-avatar--activity-entering::after {
+  position: absolute;
+  border: 2px solid rgb(34 197 94 / 55%);
+  border-radius: 50%;
+  content: '';
+  inset: -3px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.65);
+  animation: collapsed-avatar-entry-halo 480ms ease-out both;
+}
+
+@keyframes collapsed-avatar-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) rotate(90deg) scale(0.55);
+  }
+
+  62% {
+    opacity: 1;
+    transform: translateY(0) rotate(90deg) scale(1.15);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(90deg) scale(1);
+  }
+}
+
+@keyframes collapsed-avatar-entry-halo {
+  0% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+
+  28% {
+    opacity: 0.55;
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1.45);
+  }
 }
 
 .message-avatar__pacman-half {
   position: absolute;
-  left: 0;
+  left: -3px;
   width: 34px;
   height: 17px;
   background: #22c55e;
 }
 
 .message-avatar__pacman-half--top {
-  top: 0;
+  top: -3px;
   border-radius: 34px 34px 0 0;
   animation: pacman-chomp-top 440ms ease-in-out infinite;
   transform-origin: 50% 100%;
 }
 
 .message-avatar__pacman-half--bottom {
-  bottom: 0;
+  bottom: -3px;
   border-radius: 0 0 34px 34px;
   animation: pacman-chomp-bottom 440ms ease-in-out infinite;
   transform-origin: 50% 0;
@@ -688,8 +966,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   opacity: 0;
   place-items: center;
   transform: translateX(var(--tool-x));
-  animation: tool-float-to-last-avatar 4s linear var(--tool-delay) both;
-  animation-iteration-count: infinite;
+  animation: tool-float-to-last-avatar 4s linear both;
 }
 
 .chat-panel__floating-tool :deep(.tool-event-icon) {
@@ -719,18 +996,6 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   }
 }
 
-@keyframes pacman-swallow {
-  0%,
-  24%,
-  100% {
-    transform: rotate(90deg) scale(1);
-  }
-
-  10% {
-    transform: rotate(90deg) scale(1.18);
-  }
-}
-
 @keyframes tool-float-to-last-avatar {
   0% {
     top: calc(100% + 12px);
@@ -742,16 +1007,16 @@ function toolEventLabel(tool: ConversationToolEvent): string {
     opacity: 0.82;
   }
 
-  78% {
+  99.9% {
     top: calc(50% + var(--last-avatar-offset));
     opacity: 0.82;
     transform: translate(0, 0) scale(1);
   }
 
   100% {
-    top: calc(50% + var(--last-avatar-offset) - 2px);
+    top: calc(50% + var(--last-avatar-offset));
     opacity: 0;
-    transform: translate(0, 0) scale(0.15);
+    transform: translate(0, 0) scale(1);
   }
 }
 
@@ -759,6 +1024,57 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   width: 20px;
   height: 20px;
   flex-basis: 20px;
+}
+
+.message-avatar--assistant-loading {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.message-avatar--assistant-loading::before,
+.message-avatar--assistant-loading::after {
+  position: absolute;
+  border-radius: 50%;
+  content: '';
+  inset: 0;
+  transform: scale(0);
+  transform-origin: center;
+}
+
+.message-avatar--assistant-loading::before {
+  z-index: 1;
+  background: var(--ui-color-white);
+  animation: assistant-avatar-fill-white 1.8s linear infinite;
+}
+
+.message-avatar--assistant-loading::after {
+  z-index: 2;
+  background: #22c55e;
+  animation: assistant-avatar-fill-green 1.8s linear infinite;
+}
+
+@keyframes assistant-avatar-fill-white {
+  0% {
+    transform: scale(0);
+  }
+
+  45%,
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes assistant-avatar-fill-green {
+  0%,
+  50% {
+    transform: scale(0);
+  }
+
+  95%,
+  100% {
+    transform: scale(1);
+  }
 }
 
 .message-avatar--in-bubble {
@@ -770,6 +1086,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 }
 
 .message--assistant {
+  width: 100%;
   max-width: min(760px, 100%);
   padding: 5px 0 !important;
 }
@@ -795,16 +1112,29 @@ function toolEventLabel(tool: ConversationToolEvent): string {
     animation: none;
   }
 
+  .collapsed-avatar-move {
+    transition: none;
+  }
+
   .chat-panel__floating-tool {
     animation: none;
   }
 
   .message-avatar--pacman {
-    animation: none;
     transform: rotate(90deg);
   }
 
+  .message-avatar--activity-entering,
+  .message-avatar--activity-entering::after {
+    animation: none;
+  }
+
   .message-avatar__pacman-half {
+    animation: none;
+  }
+
+  .message-avatar--assistant-loading::before,
+  .message-avatar--assistant-loading::after {
     animation: none;
   }
 
