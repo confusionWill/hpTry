@@ -54,6 +54,8 @@
     "sending": "Sending",
     "stop": "Stop",
     "stopping": "Stopping",
+    "agentRunning": "Agent is running and using tools",
+    "agentActivityPreview": "Preview of the Agent consuming tools",
     "stopped": "Generation stopped.",
     "loadingOlder": "Loading earlier messages…",
     "upload": {

@@ -54,6 +54,8 @@
     "sending": "发送中",
     "stop": "停止",
     "stopping": "停止中",
+    "agentRunning": "Agent 正在运行并调用工具",
+    "agentActivityPreview": "Agent 吃掉工具的动画预览",
     "stopped": "已停止生成。",
     "loadingOlder": "正在加载更早的消息…",
     "upload": {

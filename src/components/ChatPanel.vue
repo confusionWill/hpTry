@@ -22,15 +22,57 @@
     </div>
 
     <template v-else-if="canChat">
-      <div v-show="collapsed" class="chat-panel__avatar-list">
+      <div
+        v-show="collapsed"
+        class="chat-panel__avatar-list"
+        :style="{
+          '--last-avatar-offset': `${Math.max(collapsedConversationBubbles.length, 1) * 20 - 30}px`,
+        }"
+      >
         <span
-          v-for="bubble in collapsedConversationBubbles"
+          v-for="(bubble, index) in collapsedConversationBubbles"
           :key="bubble.id"
           class="message-avatar"
-          :class="`message-avatar--${bubble.type}`"
+          :class="
+            index === collapsedConversationBubbles.length - 1
+              ? 'message-avatar--pacman'
+              : `message-avatar--${bubble.type}`
+          "
           :style="avatarTransitionStyle(bubble.id)"
           aria-hidden="true"
-        />
+        >
+          <template
+            v-if="index === collapsedConversationBubbles.length - 1"
+          >
+            <span class="message-avatar__pacman-half message-avatar__pacman-half--top" />
+            <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
+          </template>
+        </span>
+
+        <span
+          v-if="collapsedConversationBubbles.length === 0"
+          class="message-avatar message-avatar--pacman"
+          aria-hidden="true"
+        >
+          <span class="message-avatar__pacman-half message-avatar__pacman-half--top" />
+          <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
+        </span>
+
+        <div
+          class="chat-panel__tool-stream"
+          role="status"
+          :aria-label="t('conversation.agentActivityPreview')"
+        >
+          <span
+            v-for="(toolName, index) in previewToolNames"
+            :key="toolName"
+            class="chat-panel__floating-tool"
+            :style="toolAnimationStyle(index)"
+            aria-hidden="true"
+          >
+            <ToolEventIcon :tool-name="toolName" status="success" />
+          </span>
+        </div>
       </div>
 
       <div v-show="!collapsed" class="chat-panel__body">
@@ -234,6 +276,12 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
   return bubbles
 })
 const collapsedConversationBubbles = computed(() => conversationBubbles.value.slice(-8))
+const previewToolNames = [
+  'search_files',
+  'read_files',
+  'edit_file',
+  'write_file',
+] as const
 const transitioningBubbleIds = computed(
   () => new Set(collapsedConversationBubbles.value.map((bubble) => bubble.id)),
 )
@@ -374,6 +422,15 @@ function avatarTransitionStyle(bubbleId: string): Record<string, string> {
   }
 }
 
+function toolAnimationStyle(index: number): Record<string, string> {
+  const horizontalOffsets = ['-13px', '11px', '-9px', '14px']
+
+  return {
+    '--tool-x': horizontalOffsets[index % horizontalOffsets.length] ?? '0px',
+    '--tool-delay': `${index * -1}s`,
+  }
+}
+
 async function toggleCollapsed() {
   if (isTransitioning.value) {
     return
@@ -474,6 +531,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 }
 
 .chat-panel__avatar-list {
+  position: relative;
   display: flex;
   min-height: 0;
   align-items: center;
@@ -576,6 +634,127 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   background: #22c55e;
 }
 
+.message-avatar--pacman {
+  position: relative;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  flex-basis: 34px;
+  border-radius: 0;
+  background: transparent;
+  filter: drop-shadow(0 4px 7px rgb(34 197 94 / 22%));
+  animation: pacman-swallow 1s ease-out infinite;
+  transform-origin: 50% 50%;
+}
+
+.message-avatar__pacman-half {
+  position: absolute;
+  left: 0;
+  width: 34px;
+  height: 17px;
+  background: #22c55e;
+}
+
+.message-avatar__pacman-half--top {
+  top: 0;
+  border-radius: 34px 34px 0 0;
+  animation: pacman-chomp-top 440ms ease-in-out infinite;
+  transform-origin: 50% 100%;
+}
+
+.message-avatar__pacman-half--bottom {
+  bottom: 0;
+  border-radius: 0 0 34px 34px;
+  animation: pacman-chomp-bottom 440ms ease-in-out infinite;
+  transform-origin: 50% 0;
+}
+
+.chat-panel__tool-stream {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.chat-panel__floating-tool {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: calc(50% - 10px);
+  display: grid;
+  width: 20px;
+  height: 20px;
+  color: var(--ui-text-color-secondary);
+  opacity: 0;
+  place-items: center;
+  transform: translateX(var(--tool-x));
+  animation: tool-float-to-last-avatar 4s linear var(--tool-delay) both;
+  animation-iteration-count: infinite;
+}
+
+.chat-panel__floating-tool :deep(.tool-event-icon) {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes pacman-chomp-top {
+  0%,
+  100% {
+    transform: rotate(-4deg);
+  }
+
+  50% {
+    transform: rotate(-34deg);
+  }
+}
+
+@keyframes pacman-chomp-bottom {
+  0%,
+  100% {
+    transform: rotate(4deg);
+  }
+
+  50% {
+    transform: rotate(34deg);
+  }
+}
+
+@keyframes pacman-swallow {
+  0%,
+  24%,
+  100% {
+    transform: rotate(90deg) scale(1);
+  }
+
+  10% {
+    transform: rotate(90deg) scale(1.18);
+  }
+}
+
+@keyframes tool-float-to-last-avatar {
+  0% {
+    top: calc(100% + 12px);
+    opacity: 0;
+    transform: translate(var(--tool-x), 8px) scale(0.72);
+  }
+
+  14% {
+    opacity: 0.82;
+  }
+
+  78% {
+    top: calc(50% + var(--last-avatar-offset));
+    opacity: 0.82;
+    transform: translate(0, 0) scale(1);
+  }
+
+  100% {
+    top: calc(50% + var(--last-avatar-offset) - 2px);
+    opacity: 0;
+    transform: translate(0, 0) scale(0.15);
+  }
+}
+
 .message-avatar--assistant-meta {
   width: 20px;
   height: 20px;
@@ -614,6 +793,32 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   .chat-panel__body,
   .empty-state {
     animation: none;
+  }
+
+  .chat-panel__floating-tool {
+    animation: none;
+  }
+
+  .message-avatar--pacman {
+    animation: none;
+    transform: rotate(90deg);
+  }
+
+  .message-avatar__pacman-half {
+    animation: none;
+  }
+
+  .message-avatar__pacman-half--top {
+    transform: rotate(-22deg);
+  }
+
+  .message-avatar__pacman-half--bottom {
+    transform: rotate(22deg);
+  }
+
+  .chat-panel__floating-tool:last-child {
+    top: calc(50% + var(--last-avatar-offset) + 40px);
+    opacity: 0.65;
   }
 }
 
