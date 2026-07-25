@@ -352,25 +352,11 @@ const showCollapsedAgentActivity = computed(
 const showStandalonePacman = computed(
   () => {
     const lastBubble = conversationBubbles.value.at(-1)
-    const runningTurn = selectedRunningTurn.value
-    const hasToolAnimations =
-      pendingToolAnimations.value.length > 0 || activeToolAnimations.value.length > 0
-
-    if (!showCollapsedAgentActivity.value) {
-      return false
-    }
-
-    if (!lastBubble) {
-      return true
-    }
-
-    if (runningTurn) {
-      return lastBubble.type !== 'assistant' || lastBubble.turnId !== runningTurn.id
-    }
 
     return (
-      store.isSelectedConversationRunning ||
-      (hasToolAnimations && lastBubble.type !== 'assistant')
+      showCollapsedAgentActivity.value &&
+      lastBubble !== undefined &&
+      lastBubble.type !== 'assistant'
     )
   },
 )
@@ -424,7 +410,6 @@ function isLoadingAssistantBubble(
 
 function isCollapsedPacmanBubble(bubble: ConversationBubble, index: number): boolean {
   if (
-    !showCollapsedAgentActivity.value ||
     bubble.type !== 'assistant' ||
     index !== collapsedConversationBubbles.value.length - 1
   ) {
