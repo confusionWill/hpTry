@@ -51,16 +51,6 @@
               <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
             </template>
           </span>
-
-          <span
-            v-if="showStandalonePacman"
-            key="standalone-pacman"
-            class="message-avatar message-avatar--pacman"
-            aria-hidden="true"
-          >
-            <span class="message-avatar__pacman-half message-avatar__pacman-half--top" />
-            <span class="message-avatar__pacman-half message-avatar__pacman-half--bottom" />
-          </span>
         </TransitionGroup>
 
         <div
@@ -349,25 +339,10 @@ const showCollapsedAgentActivity = computed(
     pendingToolAnimations.value.length > 0 ||
     activeToolAnimations.value.length > 0,
 )
-const showStandalonePacman = computed(
-  () => {
-    const lastBubble = conversationBubbles.value.at(-1)
-
-    return (
-      showCollapsedAgentActivity.value &&
-      lastBubble !== undefined &&
-      lastBubble.type !== 'assistant'
-    )
-  },
+const collapsedConversationBubbles = computed(() =>
+  conversationBubbles.value.slice(-MAX_COLLAPSED_AVATARS),
 )
-const collapsedConversationBubbles = computed(() => {
-  const bubbleLimit = MAX_COLLAPSED_AVATARS - (showStandalonePacman.value ? 1 : 0)
-
-  return conversationBubbles.value.slice(-bubbleLimit)
-})
-const collapsedAvatarCount = computed(
-  () => collapsedConversationBubbles.value.length + (showStandalonePacman.value ? 1 : 0),
-)
+const collapsedAvatarCount = computed(() => collapsedConversationBubbles.value.length)
 const transitioningBubbleIds = computed(
   () => new Set(collapsedConversationBubbles.value.map((bubble) => bubble.id)),
 )
@@ -410,10 +385,14 @@ function isLoadingAssistantBubble(
 
 function isCollapsedPacmanBubble(bubble: ConversationBubble, index: number): boolean {
   if (
-    bubble.type !== 'assistant' ||
+    !showCollapsedAgentActivity.value ||
     index !== collapsedConversationBubbles.value.length - 1
   ) {
     return false
+  }
+
+  if (bubble.type !== 'assistant') {
+    return true
   }
 
   if (selectedRunningTurn.value) {
@@ -761,6 +740,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   background: #374151;
   color: var(--ui-color-white);
   padding: 0;
+  view-transition-name: chat-panel-toggle;
 }
 
 .chat-panel__collapse:hover:not(:disabled) {
@@ -960,7 +940,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   opacity: 0;
   place-items: center;
   transform: translateX(var(--tool-x));
-  animation: tool-float-to-last-avatar 4s linear both;
+  animation: tool-float-to-last-avatar 3s linear both;
 }
 
 .chat-panel__floating-tool :deep(.tool-event-icon) {

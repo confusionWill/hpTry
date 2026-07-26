@@ -95,9 +95,15 @@ textarea {
 
 ::view-transition-old(chat-panel-shell),
 ::view-transition-new(chat-panel-shell),
+::view-transition-old(chat-panel-toggle),
+::view-transition-new(chat-panel-toggle),
 ::view-transition-old(workspace-preview),
 ::view-transition-new(workspace-preview) {
   mix-blend-mode: normal;
+}
+
+::view-transition-group(chat-panel-toggle) {
+  z-index: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {
