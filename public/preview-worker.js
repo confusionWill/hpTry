@@ -38,7 +38,7 @@ async function handlePreviewRequest(request, url) {
     return notFoundResponse()
   }
 
-  return fileResponse(file, asset, request, previewPath)
+  return fileResponse(file, asset, request)
 }
 
 function parsePreviewPath(pathname) {
@@ -73,9 +73,9 @@ async function readWorkspaceAsset(assetId) {
   return requestResult(store.get(assetId))
 }
 
-async function fileResponse(file, asset, request, previewPath) {
+async function fileResponse(file, asset, request) {
   const headers = baseHeaders(file.path, file.mimeType)
-  const body = await bodyForFile(file, asset, previewPath)
+  const body = await bodyForFile(file, asset)
 
   if (body instanceof Blob) {
     const range = request.headers.get('Range')
@@ -99,7 +99,7 @@ async function fileResponse(file, asset, request, previewPath) {
   })
 }
 
-async function bodyForFile(file, asset, previewPath) {
+async function bodyForFile(file, asset) {
   if (asset?.blob) {
     return asset.blob
   }
@@ -117,62 +117,10 @@ async function bodyForFile(file, asset, previewPath) {
   }
 
   if (typeof content === 'string') {
-    return rewritePreviewText(content, previewPath)
+    return content
   }
 
   return content
-}
-
-function rewritePreviewText(content, previewPath) {
-  const extension = extensionForPath(previewPath.filePath)
-  const previewRoot = `${PREVIEW_PREFIX}${encodeURIComponent(previewPath.projectId)}/`
-
-  if (extension === 'html' || extension === 'htm') {
-    return rewriteHtmlRootUrls(content, previewRoot)
-  }
-
-  if (extension === 'css') {
-    return rewriteCssRootUrls(content, previewRoot)
-  }
-
-  return content
-}
-
-function rewriteHtmlRootUrls(content, previewRoot) {
-  return content
-    .replace(
-      /\b(src|href|action|poster)=("|')\/(?!\/)([^"']*)\2/gi,
-      (_match, attribute, quote, rawPath) =>
-        `${attribute}=${quote}${previewRoot}${rawPath}${quote}`,
-    )
-    .replace(/\bsrcset=("|')([^"']*)\1/gi, (_match, quote, value) => {
-      const rewrittenValue = value
-        .split(',')
-        .map((entry) => {
-          const trimmedEntry = entry.trim()
-
-          if (!trimmedEntry.startsWith('/')) {
-            return entry
-          }
-
-          return entry.replace('/' + trimmedEntry.slice(1), `${previewRoot}${trimmedEntry.slice(1)}`)
-        })
-        .join(',')
-
-      return `srcset=${quote}${rewrittenValue}${quote}`
-    })
-}
-
-function rewriteCssRootUrls(content, previewRoot) {
-  return content
-    .replace(
-      /url\((["']?)\/(?!\/)([^"')]+)\1\)/gi,
-      (_match, quote, rawPath) => `url(${quote}${previewRoot}${rawPath}${quote})`,
-    )
-    .replace(
-      /@import\s+(["'])\/(?!\/)([^"']+)\1/gi,
-      (_match, quote, rawPath) => `@import ${quote}${previewRoot}${rawPath}${quote}`,
-    )
 }
 
 function baseHeaders(path, mimeType) {
