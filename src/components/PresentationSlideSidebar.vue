@@ -20,7 +20,6 @@
               aria-hidden="true"
               class="slide-sidebar__frame"
               loading="lazy"
-              sandbox="allow-same-origin allow-scripts"
               tabindex="-1"
               :src="thumbnailUrl(index + 1)"
               :title="t('workspace.livePreview.slideThumbnail', { page: index + 1 })"

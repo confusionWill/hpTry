@@ -55,7 +55,10 @@
         <div
           ref="previewViewportRef"
           class="live-preview__viewport"
-          :class="{ 'live-preview__viewport--fixed': selectedAspectRatioValue !== null }"
+          :class="{
+            'live-preview__viewport--fixed': selectedAspectRatioValue !== null,
+            'live-preview__viewport--focused': isPreviewFocused,
+          }"
           :style="previewViewportStyle"
         >
           <iframe
@@ -79,6 +82,26 @@
           >
             {{ t('workspace.livePreview.updating') }}
           </div>
+          <Transition name="live-preview-focus-hint">
+            <div
+              v-if="
+                !agentStore.isSelectedProjectRunning && isPreviewFocusHintVisible
+              "
+              aria-live="polite"
+              class="live-preview__focus-hint"
+              :class="{ 'live-preview__focus-hint--active': isPreviewFocused }"
+              role="status"
+            >
+              <Keyboard :size="14" aria-hidden="true" />
+              <span>
+                {{
+                  isPreviewFocused
+                    ? t('workspace.livePreview.keyboardReady')
+                    : t('workspace.livePreview.focusHint')
+                }}
+              </span>
+            </div>
+          </Transition>
         </div>
       </div>
     </div>
@@ -86,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { Maximize2, Minimize2 } from '@lucide/vue'
+import { Keyboard, Maximize2, Minimize2 } from '@lucide/vue'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -121,9 +144,13 @@ const previewHostFrameRef = ref<HTMLIFrameElement | null>(null)
 const previewFrameRef = ref<HTMLIFrameElement | null>(null)
 const previewViewportRef = ref<HTMLDivElement | null>(null)
 const isPreviewFullscreen = ref(false)
+const isPreviewFocused = ref(false)
+const isPreviewFocusHintVisible = ref(true)
 let previewResizeObserver: ResizeObserver | null = null
 let previewHostTimeout: ReturnType<typeof setTimeout> | null = null
 let previewHostPort: MessagePort | null = null
+let previewFocusSyncTimer: ReturnType<typeof setTimeout> | null = null
+let previewFocusHintTimer: ReturnType<typeof setTimeout> | null = null
 
 const previewHostFrameUrl = computed(() =>
   createPreviewHostUrl(previewSession, previewHostAttempt.value),
@@ -162,16 +189,27 @@ const indexFile = computed(() => presentationStore.indexFile)
 onMounted(() => {
   presentationStore.beginPreviewSession(previewSession)
   window.addEventListener('message', handlePreviewMessage)
+  window.addEventListener('blur', schedulePreviewFocusSync)
+  window.addEventListener('focus', schedulePreviewFocusSync)
+  document.addEventListener('focusin', schedulePreviewFocusSync)
+  document.addEventListener('pointerdown', schedulePreviewFocusSync, true)
   document.addEventListener('fullscreenchange', syncFullscreenState)
   previewResizeObserver = new ResizeObserver(updatePreviewScale)
   startPreviewHostTimeout()
+  showPreviewFocusHint()
 })
 
 onUnmounted(() => {
+  clearPreviewFocusSync()
+  clearPreviewFocusHint()
   clearPreviewHostTimeout()
   closePreviewHostPort()
   presentationStore.endPreviewSession(previewSession)
   window.removeEventListener('message', handlePreviewMessage)
+  window.removeEventListener('blur', schedulePreviewFocusSync)
+  window.removeEventListener('focus', schedulePreviewFocusSync)
+  document.removeEventListener('focusin', schedulePreviewFocusSync)
+  document.removeEventListener('pointerdown', schedulePreviewFocusSync, true)
   previewResizeObserver?.disconnect()
   document.removeEventListener('fullscreenchange', syncFullscreenState)
 })
@@ -198,9 +236,31 @@ watch(
 watch(
   () => agentStore.isSelectedProjectRunning,
   (isRunning) => {
-    if (isRunning && document.activeElement === previewFrameRef.value) {
-      previewFrameRef.value?.blur()
+    if (isRunning) {
+      if (document.activeElement === previewFrameRef.value) {
+        previewFrameRef.value?.blur()
+      }
+      isPreviewFocused.value = false
+      clearPreviewFocusHint()
+      isPreviewFocusHintVisible.value = false
+    } else {
+      schedulePreviewFocusSync()
     }
+  },
+)
+watch(
+  () => agentStore.selectedProjectId,
+  () => {
+    isPreviewFocused.value = false
+    showPreviewFocusHint()
+    schedulePreviewFocusSync()
+  },
+)
+watch(
+  () => presentationStore.previewUrl,
+  () => {
+    isPreviewFocused.value = false
+    schedulePreviewFocusSync()
   },
 )
 watch(
@@ -535,8 +595,55 @@ function updatePreviewScale() {
 
 function focusPreviewFrame() {
   requestAnimationFrame(() => {
-    previewFrameRef.value?.focus()
+    const frame = previewFrameRef.value
+
+    frame?.focus()
+    schedulePreviewFocusSync()
   })
+}
+
+function schedulePreviewFocusSync() {
+  clearPreviewFocusSync()
+  previewFocusSyncTimer = setTimeout(() => {
+    previewFocusSyncTimer = null
+    const nextFocused =
+      !agentStore.isSelectedProjectRunning &&
+      document.activeElement === previewFrameRef.value
+
+    if (nextFocused !== isPreviewFocused.value) {
+      isPreviewFocused.value = nextFocused
+
+      if (nextFocused) {
+        showPreviewFocusHint()
+      } else {
+        clearPreviewFocusHint()
+        isPreviewFocusHintVisible.value = false
+      }
+    }
+  })
+}
+
+function clearPreviewFocusSync() {
+  if (previewFocusSyncTimer) {
+    clearTimeout(previewFocusSyncTimer)
+    previewFocusSyncTimer = null
+  }
+}
+
+function showPreviewFocusHint() {
+  clearPreviewFocusHint()
+  isPreviewFocusHintVisible.value = true
+  previewFocusHintTimer = setTimeout(() => {
+    previewFocusHintTimer = null
+    isPreviewFocusHintVisible.value = false
+  }, 1_000)
+}
+
+function clearPreviewFocusHint() {
+  if (previewFocusHintTimer) {
+    clearTimeout(previewFocusHintTimer)
+    previewFocusHintTimer = null
+  }
 }
 </script>
 
@@ -606,6 +713,15 @@ function focusPreviewFrame() {
   aspect-ratio: var(--preview-aspect-ratio);
 }
 
+.live-preview__viewport--focused::after {
+  position: absolute;
+  z-index: 2;
+  border: 3px solid var(--ui-color-primary);
+  content: '';
+  inset: 0;
+  pointer-events: none;
+}
+
 .live-preview__frame {
   display: block;
   width: 100%;
@@ -631,6 +747,46 @@ function focusPreviewFrame() {
   font-size: 12px;
   line-height: 1.4;
   pointer-events: none;
+}
+
+.live-preview__focus-hint {
+  position: absolute;
+  z-index: 1;
+  bottom: 12px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  padding: 7px 10px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 999px;
+  background: rgb(17 19 24 / 82%);
+  color: #ffffff;
+  font-size: 12px;
+  gap: 6px;
+  line-height: 1.4;
+  pointer-events: none;
+  transform: translateX(-50%);
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+  white-space: nowrap;
+}
+
+.live-preview__focus-hint--active {
+  background: var(--ui-color-primary);
+}
+
+.live-preview-focus-hint-enter-active,
+.live-preview-focus-hint-leave-active {
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
+}
+
+.live-preview-focus-hint-enter-from,
+.live-preview-focus-hint-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 4px);
 }
 
 .live-preview__viewport--fixed .live-preview__frame {
