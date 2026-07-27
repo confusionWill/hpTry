@@ -12,13 +12,18 @@ import {
   Wrench,
 } from '@lucide/vue'
 import type { Component } from 'vue'
-import type { ComposerTranslation } from 'vue-i18n'
+import type {
+  ComposerNumberFormatting,
+  ComposerTranslation,
+} from 'vue-i18n'
 
 import type { AgentToolName } from '@/services/agent/tools'
 import type { ConversationToolEvent } from '@/types/agent'
+import { formatBytes } from '@/utils/format'
 
 interface ToolSummaryContext {
   input: Record<string, unknown>
+  n: ComposerNumberFormatting
   output: Record<string, unknown>
   t: ComposerTranslation
 }
@@ -38,14 +43,6 @@ function getNumber(value: Record<string, unknown>, key: string): number | undefi
   const result = value[key]
 
   return typeof result === 'number' ? result : undefined
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-
-  return `${(bytes / 1024).toFixed(1)} KB`
 }
 
 const toolPresentations: Record<AgentToolName, ToolPresentation> = {
@@ -80,14 +77,14 @@ const toolPresentations: Record<AgentToolName, ToolPresentation> = {
   },
   write_file: {
     icon: FilePlus,
-    summarize: ({ input, output, t }) => {
+    summarize: ({ input, n, output, t }) => {
       const path = getString(input, 'path') || getString(output, 'path')
       const bytes = getNumber(output, 'bytes')
 
       if (path && bytes !== undefined) {
         return t('conversation.toolSummary.writeFileWithBytes', {
           path,
-          bytes: formatBytes(bytes),
+          bytes: formatBytes(bytes, n),
         })
       }
 
@@ -98,14 +95,14 @@ const toolPresentations: Record<AgentToolName, ToolPresentation> = {
   },
   edit_file: {
     icon: Pencil,
-    summarize: ({ input, output, t }) => {
+    summarize: ({ input, n, output, t }) => {
       const path = getString(input, 'path') || getString(output, 'path')
       const bytes = getNumber(output, 'bytes')
 
       if (path && bytes !== undefined) {
         return t('conversation.toolSummary.editFileWithBytes', {
           path,
-          bytes: formatBytes(bytes),
+          bytes: formatBytes(bytes, n),
         })
       }
 
@@ -199,6 +196,7 @@ export function toolIconForName(toolName: string): Component {
 export function summarizeToolEvent(
   tool: ConversationToolEvent,
   t: ComposerTranslation,
+  n: ComposerNumberFormatting,
 ): string {
   if (tool.error) {
     return tool.error
@@ -212,6 +210,7 @@ export function summarizeToolEvent(
 
   return presentation.summarize({
     input: parseToolPayload(tool.input),
+    n,
     output: parseToolPayload(tool.output),
     t,
   })

@@ -50,9 +50,9 @@ const emit = defineEmits<{
   closed: []
 }>()
 
-const { t } = useI18n()
+const { n, t } = useI18n()
 const toolSummary = computed(() =>
-  props.tool ? summarizeToolEvent(props.tool, t) : '',
+  props.tool ? summarizeToolEvent(props.tool, t, n) : '',
 )
 
 function formatPayload(payload: string): string {

@@ -32,6 +32,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronRight, FileText, Folder, FolderOpen } from '@lucide/vue'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import type { WorkspaceFile } from '@/types/agent'
 
@@ -53,9 +54,15 @@ const emit = defineEmits<{
   select: [path: string]
 }>()
 
+const { locale } = useI18n()
 const expandedFolders = ref<Set<string>>(new Set())
+const fileNameCollator = computed(
+  () => new Intl.Collator(locale.value, { numeric: true, sensitivity: 'base' }),
+)
 
-const treeNodes = computed<FileTreeNode[]>(() => buildFileTree(props.files))
+const treeNodes = computed<FileTreeNode[]>(() =>
+  buildFileTree(props.files, fileNameCollator.value.compare),
+)
 const visibleNodes = computed<FileTreeNode[]>(() => flattenVisibleNodes(treeNodes.value))
 
 watch(
@@ -72,7 +79,10 @@ watch(
   { immediate: true },
 )
 
-function buildFileTree(files: WorkspaceFile[]): FileTreeNode[] {
+function buildFileTree(
+  files: WorkspaceFile[],
+  compareNames: (first: string, second: string) => number,
+): FileTreeNode[] {
   const roots: FileTreeNode[] = []
   const folders = new Map<string, FileTreeNode>()
 
@@ -114,21 +124,24 @@ function buildFileTree(files: WorkspaceFile[]): FileTreeNode[] {
     })
   }
 
-  return sortTreeNodes(roots)
+  return sortTreeNodes(roots, compareNames)
 }
 
-function sortTreeNodes(nodes: FileTreeNode[]): FileTreeNode[] {
+function sortTreeNodes(
+  nodes: FileTreeNode[],
+  compareNames: (first: string, second: string) => number,
+): FileTreeNode[] {
   return nodes
     .map((node) => ({
       ...node,
-      children: sortTreeNodes(node.children),
+      children: sortTreeNodes(node.children, compareNames),
     }))
     .sort((a, b) => {
       if (a.kind !== b.kind) {
         return a.kind === 'folder' ? -1 : 1
       }
 
-      return a.name.localeCompare(b.name)
+      return compareNames(a.name, b.name)
     })
 }
 

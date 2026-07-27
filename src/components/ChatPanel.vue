@@ -215,6 +215,7 @@ import type {
   ConversationMessageEvent,
   ConversationToolEvent,
 } from '@/types/agent'
+import { formatDuration } from '@/utils/format'
 import { summarizeToolEvent as summarizeTool } from '@/utils/toolPresentation'
 
 type ConversationBubble =
@@ -246,7 +247,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useAgentStore()
-const { t } = useI18n()
+const { n, t } = useI18n()
 const isTransitioning = ref(false)
 const messagesRef = ref<HTMLElement | null>(null)
 const shouldStickToBottom = ref(true)
@@ -727,15 +728,11 @@ async function toggleCollapsed() {
 }
 
 function formatAnswerDuration(durationMs: number): string {
-  if (durationMs < 1000) {
-    return `${durationMs}ms`
-  }
-
-  return `${(durationMs / 1000).toFixed(1)}s`
+  return formatDuration(durationMs, n)
 }
 
 function summarizeToolEvent(tool: ConversationToolEvent): string {
-  return summarizeTool(tool, t)
+  return summarizeTool(tool, t, n)
 }
 
 function toolEventLabel(tool: ConversationToolEvent): string {

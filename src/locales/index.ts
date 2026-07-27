@@ -12,6 +12,59 @@ function isAppLocale(value: string | null): value is AppLocale {
   return APP_LOCALES.some((locale) => locale === value)
 }
 
+function matchSupportedLocale(value: string): AppLocale | undefined {
+  let canonicalLocale: string
+
+  try {
+    ;[canonicalLocale] = Intl.getCanonicalLocales(value)
+  } catch {
+    return undefined
+  }
+
+  if (!canonicalLocale) {
+    return undefined
+  }
+
+  const exactMatch = APP_LOCALES.find(
+    (locale) => locale.toLowerCase() === canonicalLocale.toLowerCase(),
+  )
+
+  if (exactMatch) {
+    return exactMatch
+  }
+
+  const language = canonicalLocale.split('-')[0]?.toLowerCase()
+
+  if (language === 'zh') {
+    return 'zh-CN'
+  }
+
+  if (language === 'en') {
+    return 'en'
+  }
+
+  return undefined
+}
+
+function getBrowserAppLocale(): AppLocale | undefined {
+  if (typeof navigator === 'undefined') {
+    return undefined
+  }
+
+  const preferredLocales =
+    navigator.languages.length > 0 ? navigator.languages : [navigator.language]
+
+  for (const locale of preferredLocales) {
+    const matchedLocale = matchSupportedLocale(locale)
+
+    if (matchedLocale) {
+      return matchedLocale
+    }
+  }
+
+  return undefined
+}
+
 export function getInitialAppLocale(): AppLocale {
   try {
     const savedLocale = window.localStorage.getItem(localeStorageKey)
@@ -20,10 +73,10 @@ export function getInitialAppLocale(): AppLocale {
       return savedLocale
     }
   } catch {
-    // Keep the default locale when browser storage is unavailable.
+    // Continue with browser locale detection when storage is unavailable.
   }
 
-  return 'zh-CN'
+  return getBrowserAppLocale() ?? 'en'
 }
 
 export function persistAppLocale(locale: AppLocale): void {
@@ -35,6 +88,60 @@ export function persistAppLocale(locale: AppLocale): void {
 }
 
 const initialLocale = getInitialAppLocale()
+const numberFormats = {
+  'zh-CN': {
+    byte: {
+      style: 'unit',
+      unit: 'byte',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 0,
+    },
+    kilobyte: {
+      style: 'unit',
+      unit: 'kilobyte',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 1,
+    },
+    millisecond: {
+      style: 'unit',
+      unit: 'millisecond',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 0,
+    },
+    second: {
+      style: 'unit',
+      unit: 'second',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 1,
+    },
+  },
+  en: {
+    byte: {
+      style: 'unit',
+      unit: 'byte',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 0,
+    },
+    kilobyte: {
+      style: 'unit',
+      unit: 'kilobyte',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 1,
+    },
+    millisecond: {
+      style: 'unit',
+      unit: 'millisecond',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 0,
+    },
+    second: {
+      style: 'unit',
+      unit: 'second',
+      unitDisplay: 'narrow',
+      maximumFractionDigits: 1,
+    },
+  },
+} as const
 
 export const i18n = createI18n({
   legacy: false,
@@ -44,6 +151,7 @@ export const i18n = createI18n({
     'zh-CN': zhCN,
     en,
   },
+  numberFormats,
 })
 
 if (typeof document !== 'undefined') {

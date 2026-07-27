@@ -95,6 +95,7 @@ import {
 } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
+import { formatBytes } from '@/utils/format'
 
 interface UploadedAsset {
   path: string
@@ -106,7 +107,7 @@ const MAX_TEXT_UPLOAD_BYTES = 120_000
 
 const store = useAgentStore()
 const uiStore = useUiStore()
-const { t } = useI18n()
+const { n, t } = useI18n()
 const draft = ref('')
 const uploadedAssets = ref<UploadedAsset[]>([])
 const fileInputRef = ref<HTMLInputElement | null>(null)
@@ -143,14 +144,6 @@ const composerActionLabel = computed(() => {
 
   return currentProjectRunning.value ? t('conversation.stop') : t('conversation.send')
 })
-
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) {
-    return `${bytes} B`
-  }
-
-  return `${(bytes / 1024).toFixed(1)} KB`
-}
 
 function fileNameForPath(path: string): string {
   return path.split('/').pop() ?? path
@@ -386,7 +379,7 @@ function buildMessageContent(content: string): string {
   }
 
   const assetLines = currentProjectAssets.value.map(
-    (asset) => `- ${asset.path} (${formatBytes(asset.bytes)})`,
+    (asset) => `- ${asset.path} (${formatBytes(asset.bytes, n)})`,
   )
   const assetBlock = [
     t('conversation.upload.messageHeading'),
