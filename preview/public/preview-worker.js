@@ -1,5 +1,7 @@
-const DB_NAME = 'hpTry'
+const PROTOCOL_VERSION = 2
 const PREVIEW_PREFIX = '/preview/'
+const PREVIEW_BRIDGE_TAG = '<script src="/preview-bridge.js"></script>'
+const REQUEST_TIMEOUT_MS = 10_000
 
 self.addEventListener('install', (event) => {
   event.waitUntil(self.skipWaiting())
@@ -26,56 +28,116 @@ async function handlePreviewRequest(request, url) {
     return notFoundResponse()
   }
 
-  const file = await readWorkspaceFile(previewPath.projectId, previewPath.filePath)
+  const response = await requestPreviewResource(previewPath)
 
-  if (!file) {
-    return notFoundResponse()
+  if (response.status !== 200) {
+    return errorResponse(response.status, response.message)
   }
 
-  const asset = file.kind === 'asset' && file.assetId ? await readWorkspaceAsset(file.assetId) : null
-
-  if (file.kind === 'asset' && !asset) {
-    return notFoundResponse()
-  }
-
-  return fileResponse(file, asset, request)
+  return fileResponse(response.resource, request, previewPath)
 }
 
 function parsePreviewPath(pathname) {
   const rawPath = pathname.slice(PREVIEW_PREFIX.length)
   const parts = rawPath.split('/').filter(Boolean)
+  const session = parts.shift()
   const projectId = parts.shift()
+  const version = parts.shift()
 
-  if (!projectId) {
+  if (!session || !projectId || !version) {
     return null
   }
 
-  return {
-    projectId: decodeURIComponent(projectId),
-    filePath: normalizePath(parts.map(decodeURIComponent).join('/') || 'hp.html'),
+  try {
+    return {
+      session: decodeURIComponent(session),
+      projectId: decodeURIComponent(projectId),
+      version: decodeURIComponent(version),
+      filePath: normalizePath(parts.map(decodeURIComponent).join('/') || 'hp.html'),
+    }
+  } catch {
+    return null
   }
 }
 
-async function readWorkspaceFile(projectId, filePath) {
-  const db = await openDatabase()
-  const transaction = db.transaction('workspaceFiles', 'readonly')
-  const store = transaction.objectStore('workspaceFiles')
-  const index = store.index('projectPath')
+async function requestPreviewResource(previewPath) {
+  const host = await findPreviewHost(previewPath.session)
 
-  return requestResult(index.get([projectId, filePath]))
+  if (!host) {
+    return unavailableFileResponse('Preview host is unavailable')
+  }
+
+  const requestId = crypto.randomUUID()
+  const channel = new MessageChannel()
+
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      channel.port1.close()
+      resolve(unavailableFileResponse('Preview request timed out', requestId))
+    }, REQUEST_TIMEOUT_MS)
+
+    channel.port1.onmessage = (event) => {
+      if (!isPreviewFileResponse(event.data, requestId)) {
+        return
+      }
+
+      clearTimeout(timeout)
+      channel.port1.close()
+      resolve(event.data)
+    }
+    channel.port1.onmessageerror = () => {
+      clearTimeout(timeout)
+      channel.port1.close()
+      resolve(unavailableFileResponse('Preview response is invalid', requestId))
+    }
+    channel.port1.start()
+
+    try {
+      host.postMessage(
+        {
+          protocol: PROTOCOL_VERSION,
+          type: 'preview:file-request',
+          requestId,
+          session: previewPath.session,
+          projectId: previewPath.projectId,
+          version: previewPath.version,
+          path: previewPath.filePath,
+        },
+        [channel.port2],
+      )
+    } catch {
+      clearTimeout(timeout)
+      channel.port1.close()
+      resolve(unavailableFileResponse('Unable to contact preview host', requestId))
+    }
+  })
 }
 
-async function readWorkspaceAsset(assetId) {
-  const db = await openDatabase()
-  const transaction = db.transaction('workspaceAssets', 'readonly')
-  const store = transaction.objectStore('workspaceAssets')
+async function findPreviewHost(session) {
+  const windowClients = await self.clients.matchAll({
+    type: 'window',
+    includeUncontrolled: true,
+  })
+  const candidates = windowClients
+    .map((client) => ({ client, url: new URL(client.url) }))
+    .filter(
+      ({ url }) =>
+        url.pathname === '/' &&
+        url.searchParams.get('session') === session &&
+        Number.isInteger(Number.parseInt(url.searchParams.get('attempt') ?? '', 10)),
+    )
+    .sort(
+      (left, right) =>
+        Number.parseInt(right.url.searchParams.get('attempt') ?? '0', 10) -
+        Number.parseInt(left.url.searchParams.get('attempt') ?? '0', 10),
+    )
 
-  return requestResult(store.get(assetId))
+  return candidates[0]?.client ?? null
 }
 
-async function fileResponse(file, asset, request) {
-  const headers = baseHeaders(file.path, file.mimeType)
-  const body = await bodyForFile(file, asset)
+async function fileResponse(resource, request, previewPath) {
+  const headers = baseHeaders(resource.path, resource.mimeType)
+  const body = await bodyForResource(resource, previewPath)
 
   if (body instanceof Blob) {
     const range = request.headers.get('Range')
@@ -99,12 +161,12 @@ async function fileResponse(file, asset, request) {
   })
 }
 
-async function bodyForFile(file, asset) {
-  if (asset?.blob) {
-    return asset.blob
+async function bodyForResource(resource, previewPath) {
+  if (resource.kind === 'asset') {
+    return resource.blob
   }
 
-  const content = file.content ?? ''
+  const content = resource.content ?? ''
   const trimmedContent = typeof content === 'string' ? content.trim() : ''
   const base64Content = typeof content === 'string' ? content.replace(/\s/g, '') : ''
 
@@ -112,15 +174,73 @@ async function bodyForFile(file, asset) {
     return dataUrlToBytes(trimmedContent)
   }
 
-  if (isBinaryPath(file.path) && isBase64Content(base64Content)) {
+  if (isBinaryPath(resource.path) && isBase64Content(base64Content)) {
     return base64ToBytes(base64Content)
   }
 
   if (typeof content === 'string') {
-    return content
+    return isPreviewEntry(previewPath.filePath) ? injectPreviewBridge(content) : content
   }
 
   return content
+}
+
+function isPreviewFileResponse(value, requestId) {
+  if (!isRecord(value)) {
+    return false
+  }
+
+  if (
+    value.protocol !== PROTOCOL_VERSION ||
+    value.type !== 'preview:file-response' ||
+    value.requestId !== requestId
+  ) {
+    return false
+  }
+
+  if (value.status === 200) {
+    return (
+      isRecord(value.resource) &&
+      typeof value.resource.path === 'string' &&
+      ((value.resource.kind === 'text' && typeof value.resource.content === 'string') ||
+        (value.resource.kind === 'asset' && value.resource.blob instanceof Blob))
+    )
+  }
+
+  return (
+    (value.status === 404 || value.status === 409 || value.status === 503) &&
+    typeof value.message === 'string'
+  )
+}
+
+function unavailableFileResponse(message, requestId = '') {
+  return {
+    protocol: PROTOCOL_VERSION,
+    type: 'preview:file-response',
+    requestId,
+    status: 503,
+    message,
+  }
+}
+
+function isPreviewEntry(path) {
+  return path.split('/').pop() === 'hp.html'
+}
+
+function injectPreviewBridge(content) {
+  if (
+    /<script\b[^>]*\bsrc=(["'])\/preview-bridge\.js\1[^>]*>\s*<\/script>/i.test(content)
+  ) {
+    return content
+  }
+
+  const headEnd = content.search(/<\/head\s*>/i)
+
+  if (headEnd >= 0) {
+    return `${content.slice(0, headEnd)}${PREVIEW_BRIDGE_TAG}\n${content.slice(headEnd)}`
+  }
+
+  return `${PREVIEW_BRIDGE_TAG}\n${content}`
 }
 
 function baseHeaders(path, mimeType) {
@@ -233,22 +353,6 @@ function unsatisfiableRangeResponse(size, headers) {
       ...headers,
       'Content-Range': `bytes */${size}`,
     },
-  })
-}
-
-function openDatabase() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME)
-
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
-  })
-}
-
-function requestResult(request) {
-  return new Promise((resolve, reject) => {
-    request.onerror = () => reject(request.error)
-    request.onsuccess = () => resolve(request.result)
   })
 }
 
@@ -385,4 +489,19 @@ function notFoundResponse() {
       'Cache-Control': 'no-store',
     },
   })
+}
+
+function errorResponse(status, message) {
+  return new Response(message, {
+    status,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Cache-Control': 'no-store',
+    },
+  })
+}
+
+function isRecord(value) {
+  return typeof value === 'object' && value !== null
 }

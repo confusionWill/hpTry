@@ -1,5 +1,16 @@
 <template>
   <section class="live-preview">
+    <iframe
+      ref="previewHostFrameRef"
+      :key="previewHostFrameUrl"
+      aria-hidden="true"
+      class="live-preview__host"
+      :src="previewHostFrameUrl"
+      tabindex="-1"
+      @error="handlePreviewHostError"
+      @load="handlePreviewHostLoad"
+    />
+
     <header class="live-preview__header">
       <div class="live-preview__actions">
         <PreviewAspectRatioSelect
@@ -32,8 +43,12 @@
         :image-size="72"
       />
       <UiEmpty
-        v-else-if="!previewWorkerReady"
-        :description="t('workspace.livePreview.unavailable')"
+        v-else-if="!presentationStore.previewUrl"
+        :description="
+          previewUnavailable
+            ? t('workspace.livePreview.unavailable')
+            : t('workspace.livePreview.initializing')
+        "
         :image-size="72"
       />
       <div v-else class="live-preview__stage">
@@ -48,11 +63,22 @@
             :key="presentationStore.previewUrl"
             allowfullscreen
             class="live-preview__frame"
+            :class="{
+              'live-preview__frame--updating': agentStore.isSelectedProjectRunning,
+            }"
+            :inert="agentStore.isSelectedProjectRunning"
             :src="presentationStore.mainPreviewUrl"
             tabindex="-1"
             :title="t('workspace.livePreview.title')"
-            @load="handlePreviewFrameLoad"
           />
+          <div
+            v-if="agentStore.isSelectedProjectRunning"
+            aria-live="polite"
+            class="live-preview__updating"
+            role="status"
+          >
+            {{ t('workspace.livePreview.updating') }}
+          </div>
         </div>
       </div>
     </div>
@@ -68,16 +94,40 @@ import PreviewAspectRatioSelect from '@/components/PreviewAspectRatioSelect.vue'
 import UiButton from '@/components/ui/UiButton.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import WorkspaceExportButton from '@/components/WorkspaceExportButton.vue'
+import {
+  createPreviewHostUrl,
+  createPreviewSession,
+  isPreviewChannelMessage,
+  isPreviewFileRequest,
+  isPreviewMessage,
+  loadPreviewResource,
+  PREVIEW_ORIGIN,
+  PREVIEW_PROTOCOL_VERSION,
+  type PreviewFileRequest,
+  type PreviewFileResponse,
+  type PreviewMessage,
+} from '@/services/previewOrigin'
+import { useAgentStore } from '@/stores/agent'
 import { usePresentationStore } from '@/stores/presentation'
 
+const agentStore = useAgentStore()
 const presentationStore = usePresentationStore()
 const { t } = useI18n()
-const previewWorkerReady = ref(false)
+const previewSession = createPreviewSession()
+const previewHostAttempt = ref(0)
+const previewHostReady = ref(false)
+const previewUnavailable = ref(false)
+const previewHostFrameRef = ref<HTMLIFrameElement | null>(null)
 const previewFrameRef = ref<HTMLIFrameElement | null>(null)
 const previewViewportRef = ref<HTMLDivElement | null>(null)
 const isPreviewFullscreen = ref(false)
-let observedPreviewWindow: Window | null = null
 let previewResizeObserver: ResizeObserver | null = null
+let previewHostTimeout: ReturnType<typeof setTimeout> | null = null
+let previewHostPort: MessagePort | null = null
+
+const previewHostFrameUrl = computed(() =>
+  createPreviewHostUrl(previewSession, previewHostAttempt.value),
+)
 
 const selectedCanvasSize = computed(() => presentationStore.selectedCanvasSize)
 const selectedAspectRatioValue = computed(() => {
@@ -88,7 +138,7 @@ const selectedAspectRatioValue = computed(() => {
 const canUseFullscreen = computed(
   () =>
     Boolean(presentationStore.indexFile) &&
-    previewWorkerReady.value &&
+    Boolean(presentationStore.previewUrl) &&
     document.fullscreenEnabled &&
     Boolean(previewViewportRef.value?.requestFullscreen),
 )
@@ -109,14 +159,19 @@ const previewViewportStyle = computed<Partial<Record<string, string>>>(() => {
 
 const indexFile = computed(() => presentationStore.indexFile)
 
-onMounted(async () => {
+onMounted(() => {
+  presentationStore.beginPreviewSession(previewSession)
+  window.addEventListener('message', handlePreviewMessage)
   document.addEventListener('fullscreenchange', syncFullscreenState)
   previewResizeObserver = new ResizeObserver(updatePreviewScale)
-  previewWorkerReady.value = await registerPreviewWorker()
+  startPreviewHostTimeout()
 })
 
 onUnmounted(() => {
-  detachPreviewHashListener()
+  clearPreviewHostTimeout()
+  closePreviewHostPort()
+  presentationStore.endPreviewSession(previewSession)
+  window.removeEventListener('message', handlePreviewMessage)
   previewResizeObserver?.disconnect()
   document.removeEventListener('fullscreenchange', syncFullscreenState)
 })
@@ -135,52 +190,305 @@ watch(previewViewportRef, (viewport, previousViewport) => {
 watch(
   () => presentationStore.activeSlidePage,
   (page) => {
-    navigatePreviewFrameToSlide(page)
+    if (!agentStore.isSelectedProjectRunning) {
+      navigatePreviewFrameToSlide(page)
+    }
   },
 )
+watch(
+  () => agentStore.isSelectedProjectRunning,
+  (isRunning) => {
+    if (isRunning && document.activeElement === previewFrameRef.value) {
+      previewFrameRef.value?.blur()
+    }
+  },
+)
+watch(
+  () =>
+    [
+      agentStore.selectedProjectId,
+      presentationStore.committedPreviewVersion,
+      presentationStore.indexFile?.path ?? '',
+    ] as const,
+  () => {
+    previewUnavailable.value = false
+
+    if (previewHostReady.value) {
+      markPreviewSourceReady()
+    } else if (agentStore.selectedProjectId && presentationStore.indexFile) {
+      restartPreviewHost()
+    }
+  },
+)
+
 function navigatePreviewFrameToSlide(page: number) {
   const frameWindow = previewFrameRef.value?.contentWindow
 
   if (frameWindow) {
-    try {
-      const params = new URLSearchParams(frameWindow.location.hash.slice(1))
-      params.set('slide', String(page))
-      params.delete('mode')
-      frameWindow.location.hash = params.toString()
-    } catch {
-      // The reactive iframe src remains the fallback if the frame is not ready yet.
-    }
+    frameWindow.postMessage(
+      {
+        protocol: PREVIEW_PROTOCOL_VERSION,
+        type: 'preview:set-slide',
+        session: previewSession,
+        page,
+      },
+      PREVIEW_ORIGIN,
+    )
   }
 }
 
-function handlePreviewFrameLoad() {
-  detachPreviewHashListener()
-  observedPreviewWindow = previewFrameRef.value?.contentWindow ?? null
-  observedPreviewWindow?.addEventListener('hashchange', syncActiveSlideFromFrame)
-  syncActiveSlideFromFrame()
+function handlePreviewHostLoad() {
+  if (!previewHostReady.value) {
+    startPreviewHostTimeout()
+  }
 }
 
-function detachPreviewHashListener() {
-  observedPreviewWindow?.removeEventListener('hashchange', syncActiveSlideFromFrame)
-  observedPreviewWindow = null
+function handlePreviewHostError() {
+  previewHostReady.value = false
+  markPreviewUnavailable()
 }
 
-function syncActiveSlideFromFrame() {
-  if (!observedPreviewWindow) {
+function handlePreviewMessage(event: MessageEvent) {
+  if (
+    event.origin !== PREVIEW_ORIGIN ||
+    !isPreviewMessage(event.data) ||
+    event.data.session !== previewSession
+  ) {
+    return
+  }
+
+  if (event.source === previewHostFrameRef.value?.contentWindow) {
+    handlePreviewHostWindowMessage(event.data)
+    return
+  }
+
+  if (
+    event.source !== previewFrameRef.value?.contentWindow ||
+    !isCurrentPreviewDocumentMessage(event.data)
+  ) {
+    return
+  }
+
+  if (event.data.type === 'preview:ready') {
+    navigatePreviewFrameToSlide(presentationStore.activeSlidePage)
+    return
+  }
+
+  if (event.data.type === 'preview:slide-change' && Number.isInteger(event.data.page)) {
+    presentationStore.selectSlide(event.data.page as number)
+  }
+}
+
+function handlePreviewHostWindowMessage(message: PreviewMessage) {
+  if (message.type === 'preview:channel-request' && message.target === 'host') {
+    connectPreviewHost()
+    return
+  }
+
+  if (message.type === 'preview:error' && message.target === 'host') {
+    previewHostReady.value = false
+    closePreviewHostPort()
+    markPreviewUnavailable()
+  }
+}
+
+function connectPreviewHost() {
+  const hostWindow = previewHostFrameRef.value?.contentWindow
+
+  if (!hostWindow) {
+    return
+  }
+
+  closePreviewHostPort()
+  const channel = new MessageChannel()
+
+  previewHostPort = channel.port1
+  previewHostPort.onmessage = handlePreviewHostPortMessage
+  previewHostPort.onmessageerror = restartPreviewHost
+  previewHostPort.start()
+  startPreviewHostTimeout()
+
+  hostWindow.postMessage(
+    {
+      protocol: PREVIEW_PROTOCOL_VERSION,
+      type: 'preview:channel',
+      session: previewSession,
+    },
+    PREVIEW_ORIGIN,
+    [channel.port2],
+  )
+}
+
+function handlePreviewHostPortMessage(event: MessageEvent) {
+  if (isPreviewChannelMessage(event.data) && event.data.session === previewSession) {
+    clearPreviewHostTimeout()
+    previewHostReady.value = true
+    previewUnavailable.value = false
+    markPreviewSourceReady()
+    return
+  }
+
+  if (!isPreviewFileRequest(event.data)) {
+    return
+  }
+
+  const responsePort = event.ports[0]
+
+  if (!responsePort) {
+    return
+  }
+
+  void respondToPreviewFileRequest(event.data, responsePort)
+}
+
+async function respondToPreviewFileRequest(
+  request: PreviewFileRequest,
+  responsePort: MessagePort,
+) {
+  if (
+    request.session !== previewSession ||
+    request.projectId !== agentStore.selectedProjectId ||
+    request.version !== presentationStore.committedPreviewVersion ||
+    agentStore.isSelectedProjectRunning
+  ) {
+    respondWithPreviewFile(request, responsePort, {
+      protocol: PREVIEW_PROTOCOL_VERSION,
+      type: 'preview:file-response',
+      requestId: request.requestId,
+      status: 409,
+      message: 'Preview source changed',
+    })
     return
   }
 
   try {
-    const params = new URLSearchParams(observedPreviewWindow.location.hash.slice(1))
-    const page = Number.parseInt(params.get('slide') ?? '', 10)
-    const slideCount = presentationStore.manifest?.slides.length ?? 0
+    const resource = await loadPreviewResource(request.projectId, request.path)
 
-    if (Number.isInteger(page) && page >= 1 && page <= slideCount) {
-      presentationStore.selectSlide(page)
+    if (
+      request.session !== previewSession ||
+      request.projectId !== agentStore.selectedProjectId ||
+      request.version !== presentationStore.committedPreviewVersion ||
+      agentStore.isSelectedProjectRunning
+    ) {
+      respondWithPreviewFile(request, responsePort, {
+        protocol: PREVIEW_PROTOCOL_VERSION,
+        type: 'preview:file-response',
+        requestId: request.requestId,
+        status: 409,
+        message: 'Preview source changed',
+      })
+      return
     }
+
+    const response: PreviewFileResponse = resource
+      ? {
+          protocol: PREVIEW_PROTOCOL_VERSION,
+          type: 'preview:file-response',
+          requestId: request.requestId,
+          status: 200,
+          resource,
+        }
+      : {
+          protocol: PREVIEW_PROTOCOL_VERSION,
+          type: 'preview:file-response',
+          requestId: request.requestId,
+          status: 404,
+          message: 'Preview resource not found',
+        }
+
+    respondWithPreviewFile(request, responsePort, response)
   } catch {
-    // Ignore an inaccessible frame while its document is being replaced.
+    respondWithPreviewFile(request, responsePort, {
+      protocol: PREVIEW_PROTOCOL_VERSION,
+      type: 'preview:file-response',
+      requestId: request.requestId,
+      status: 503,
+      message: 'Unable to read preview resource',
+    })
   }
+}
+
+function respondWithPreviewFile(
+  request: PreviewFileRequest,
+  responsePort: MessagePort,
+  response: PreviewFileResponse,
+) {
+  if (response.requestId !== request.requestId) {
+    responsePort.close()
+    return
+  }
+
+  try {
+    responsePort.postMessage(response)
+  } finally {
+    responsePort.close()
+  }
+}
+
+function markPreviewSourceReady() {
+  const projectId = agentStore.selectedProjectId
+  const version = presentationStore.committedPreviewVersion
+  const indexPath = presentationStore.indexFile?.path
+
+  if (!previewHostReady.value || !projectId || !indexPath) {
+    return
+  }
+
+  if (
+    presentationStore.markPreviewSourceReady(
+      previewSession,
+      projectId,
+      version,
+      indexPath,
+    )
+  ) {
+    previewUnavailable.value = false
+  }
+}
+
+function isCurrentPreviewDocumentMessage(message: PreviewMessage): boolean {
+  if (
+    message.projectId !== agentStore.selectedProjectId ||
+    !message.version ||
+    !presentationStore.previewUrl
+  ) {
+    return false
+  }
+
+  return new URL(presentationStore.previewUrl).searchParams.get('v') === message.version
+}
+
+function restartPreviewHost() {
+  closePreviewHostPort()
+  previewHostReady.value = false
+  previewUnavailable.value = false
+  previewHostAttempt.value += 1
+  startPreviewHostTimeout()
+}
+
+function startPreviewHostTimeout() {
+  clearPreviewHostTimeout()
+  previewHostTimeout = setTimeout(() => {
+    previewHostReady.value = false
+    markPreviewUnavailable()
+  }, 10_000)
+}
+
+function clearPreviewHostTimeout() {
+  if (previewHostTimeout) {
+    clearTimeout(previewHostTimeout)
+    previewHostTimeout = null
+  }
+}
+
+function markPreviewUnavailable() {
+  clearPreviewHostTimeout()
+  previewUnavailable.value = true
+}
+
+function closePreviewHostPort() {
+  previewHostPort?.close()
+  previewHostPort = null
 }
 
 async function togglePreviewFullscreen() {
@@ -230,40 +538,6 @@ function focusPreviewFrame() {
     previewFrameRef.value?.focus()
   })
 }
-
-async function registerPreviewWorker(): Promise<boolean> {
-  if (!('serviceWorker' in navigator)) {
-    return false
-  }
-
-  try {
-    const registration = await navigator.serviceWorker.register('/preview-worker.js', {
-      scope: '/',
-    })
-    await waitForWorkerActivation(registration)
-    await navigator.serviceWorker.ready
-
-    return true
-  } catch {
-    return false
-  }
-}
-
-function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promise<void> {
-  const worker = registration.installing ?? registration.waiting ?? registration.active
-
-  if (!worker || worker.state === 'activated') {
-    return Promise.resolve()
-  }
-
-  return new Promise((resolve) => {
-    worker.addEventListener('statechange', () => {
-      if (worker.state === 'activated') {
-        resolve()
-      }
-    })
-  })
-}
 </script>
 
 <style scoped>
@@ -273,6 +547,10 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   min-height: 0;
   flex-direction: column;
   background: transparent;
+}
+
+.live-preview__host {
+  display: none;
 }
 
 .live-preview__header {
@@ -334,6 +612,25 @@ function waitForWorkerActivation(registration: ServiceWorkerRegistration): Promi
   height: 100%;
   border: 0;
   background: #ffffff;
+}
+
+.live-preview__frame--updating {
+  pointer-events: none;
+}
+
+.live-preview__updating {
+  position: absolute;
+  z-index: 1;
+  right: 12px;
+  bottom: 12px;
+  padding: 7px 10px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  background: rgb(17 19 24 / 82%);
+  color: #ffffff;
+  font-size: 12px;
+  line-height: 1.4;
+  pointer-events: none;
 }
 
 .live-preview__viewport--fixed .live-preview__frame {

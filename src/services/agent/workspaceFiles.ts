@@ -11,6 +11,17 @@ export async function loadProjectWorkspaceFiles(projectId: string): Promise<Work
   return sortWorkspaceFiles(await getRecordsByIndex('workspaceFiles', 'projectId', projectId))
 }
 
+export async function loadProjectWorkspaceFile(
+  projectId: string,
+  path: string,
+): Promise<WorkspaceFile | undefined> {
+  const normalizedPath = normalizeWorkspacePath(path)
+
+  return (
+    await getRecordsByIndex('workspaceFiles', 'projectPath', [projectId, normalizedPath])
+  )[0]
+}
+
 export async function clearTemporaryWorkspaceFiles(): Promise<void> {
   const temporaryFiles = (await getAllRecords('workspaceFiles')).filter((file) =>
     file.path.startsWith('.tmp/'),

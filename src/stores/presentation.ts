@@ -5,6 +5,7 @@ import {
   DEFAULT_PRESENTATION_SIZE,
   parsePresentationManifest,
 } from '@/services/presentationManifest'
+import { createPreviewDocumentUrl } from '@/services/previewOrigin'
 import { useAgentStore } from '@/stores/agent'
 import type { WorkspaceFile } from '@/types/agent'
 import {
@@ -17,6 +18,10 @@ export const usePresentationStore = defineStore('presentation', () => {
   const agentStore = useAgentStore()
   const activeSlidePage = ref(1)
   const committedPreviewVersion = ref('0')
+  const previewSession = ref('')
+  const mirroredProjectId = ref('')
+  const mirroredPreviewVersion = ref('')
+  const mirroredIndexPath = ref('')
   const selectedAspectRatioState = ref<PreviewAspectRatioSelection>('16-9')
   const selectedAspectRatio = computed<PreviewAspectRatioSelection>({
     get: () => selectedAspectRatioState.value,
@@ -86,13 +91,23 @@ export const usePresentationStore = defineStore('presentation', () => {
   )
 
   const previewUrl = computed(() => {
-    if (!agentStore.selectedProjectId || !indexFile.value) {
+    if (
+      !agentStore.selectedProjectId ||
+      !indexFile.value ||
+      !previewSession.value ||
+      mirroredProjectId.value !== agentStore.selectedProjectId ||
+      !mirroredPreviewVersion.value ||
+      !mirroredIndexPath.value
+    ) {
       return ''
     }
 
-    return `/preview/${encodeURIComponent(agentStore.selectedProjectId)}/${encodePreviewPath(
-      indexFile.value.path,
-    )}?v=${encodeURIComponent(committedPreviewVersion.value)}`
+    return createPreviewDocumentUrl(
+      mirroredProjectId.value,
+      mirroredIndexPath.value,
+      mirroredPreviewVersion.value,
+      previewSession.value,
+    )
   })
 
   const mainPreviewUrl = computed(() =>
@@ -117,6 +132,7 @@ export const usePresentationStore = defineStore('presentation', () => {
     () => agentStore.selectedProjectId,
     () => {
       activeSlidePage.value = 1
+      clearMirroredPreview()
     },
   )
 
@@ -187,21 +203,62 @@ export const usePresentationStore = defineStore('presentation', () => {
     }
   }
 
+  function beginPreviewSession(session: string) {
+    previewSession.value = session
+    clearMirroredPreview()
+  }
+
+  function endPreviewSession(session: string) {
+    if (previewSession.value !== session) {
+      return
+    }
+
+    previewSession.value = ''
+    clearMirroredPreview()
+  }
+
+  function markPreviewSourceReady(
+    session: string,
+    projectId: string,
+    version: string,
+    indexPath: string,
+  ): boolean {
+    if (
+      session !== previewSession.value ||
+      projectId !== agentStore.selectedProjectId ||
+      version !== committedPreviewVersion.value ||
+      normalizePath(indexPath) !== normalizePath(indexFile.value?.path ?? '')
+    ) {
+      return false
+    }
+
+    mirroredProjectId.value = projectId
+    mirroredPreviewVersion.value = version
+    mirroredIndexPath.value = normalizePath(indexPath)
+    return true
+  }
+
+  function clearMirroredPreview() {
+    mirroredProjectId.value = ''
+    mirroredPreviewVersion.value = ''
+    mirroredIndexPath.value = ''
+  }
+
   return {
     activeSlidePage,
+    beginPreviewSession,
+    committedPreviewVersion,
+    endPreviewSession,
     indexFile,
     mainPreviewUrl,
     manifest,
+    markPreviewSourceReady,
     previewUrl,
     selectedAspectRatio,
     selectedCanvasSize,
     selectSlide,
   }
 })
-
-function encodePreviewPath(path: string): string {
-  return normalizePath(path).split('/').map(encodeURIComponent).join('/')
-}
 
 function normalizePath(path: string): string {
   const parts: string[] = []

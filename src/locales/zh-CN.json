@@ -156,6 +156,8 @@
       "openSlide": "打开第 {page} 页",
       "slideThumbnail": "第 {page} 页缩略图",
       "missingIndex": "工作区需要 hp.html 才能预览",
+      "initializing": "正在准备实时预览",
+      "updating": "正在更新预览，完成后自动刷新",
       "unavailable": "当前浏览器不支持实时预览服务"
     },
     "previewDialog": {

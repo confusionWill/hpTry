@@ -156,6 +156,8 @@
       "openSlide": "Open slide {page}",
       "slideThumbnail": "Slide {page} thumbnail",
       "missingIndex": "The workspace needs hp.html to preview",
+      "initializing": "Preparing the live preview",
+      "updating": "Updating the preview. It will refresh when complete.",
       "unavailable": "This browser does not support the live preview service"
     },
     "previewDialog": {
