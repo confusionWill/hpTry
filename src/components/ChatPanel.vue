@@ -147,37 +147,42 @@
                       {{ formatAnswerDuration(bubble.message.responseDurationMs) }}
                     </span>
                   </div>
-                  <div
-                    v-if="bubble.tools.length > 0 && isToolGroupExpanded(bubble.id)"
-                    class="message__tools-list"
-                  >
-                    <template v-for="tool in bubble.tools" :key="tool.id">
+                  <div v-if="bubble.events.length > 0" class="message__event-list">
+                    <div
+                      v-for="event in bubble.events"
+                      v-show="
+                        event.type === 'message' || isToolGroupExpanded(bubble.id)
+                      "
+                      :key="event.id"
+                      class="message__event"
+                      :class="`message__event--${event.type}`"
+                    >
                       <MarkdownPreview
-                        v-if="tool.assistantContent"
-                        class="tool-event__content"
-                        :content="tool.assistantContent"
+                        v-if="assistantEventContent(event)"
+                        class="message__event-content"
+                        :content="assistantEventContent(event)"
+                        :streaming="
+                          event.type === 'message' && isStreamingAssistantMessage(event)
+                        "
                       />
                       <button
+                        v-if="event.type === 'tool'"
                         class="tool-event"
-                        :class="`tool-event--${tool.status}`"
+                        :class="`tool-event--${event.status}`"
                         type="button"
-                        :aria-label="toolEventLabel(tool)"
-                        @click="openToolDetail(tool)"
+                        :aria-label="toolEventLabel(event)"
+                        @click="openToolDetail(event)"
                       >
-                        <ToolEventIcon :tool-name="tool.toolName" :status="tool.status" />
+                        <ToolEventIcon
+                          :tool-name="event.toolName"
+                          :status="event.status"
+                        />
                         <span class="tool-event__summary">
-                          {{ summarizeToolEvent(tool) }}
+                          {{ summarizeToolEvent(event) }}
                         </span>
                       </button>
-                    </template>
+                    </div>
                   </div>
-
-                  <template v-if="bubble.message">
-                    <MarkdownPreview
-                      :content="bubble.message.content"
-                      :streaming="isStreamingAssistantMessage(bubble.message)"
-                    />
-                  </template>
                 </article>
               </div>
             </template>
@@ -205,7 +210,11 @@ import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import ToolCallDetailDialog from '@/components/ToolCallDetailDialog.vue'
 import ToolEventIcon from '@/components/ToolEventIcon.vue'
 import { useAgentStore } from '@/stores/agent'
-import type { ConversationMessageEvent, ConversationToolEvent } from '@/types/agent'
+import type {
+  ConversationEvent,
+  ConversationMessageEvent,
+  ConversationToolEvent,
+} from '@/types/agent'
 import { summarizeToolEvent as summarizeTool } from '@/utils/toolPresentation'
 
 type ConversationBubble =
@@ -219,6 +228,7 @@ type ConversationBubble =
       type: 'assistant'
       turnId: string
       tools: ConversationToolEvent[]
+      events: Array<ConversationMessageEvent | ConversationToolEvent>
       message?: ConversationMessageEvent
     }
 
@@ -284,6 +294,7 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
         type: 'assistant',
         turnId: event.turnId,
         tools: [],
+        events: [],
       }
       currentAssistantGroupIndex += 1
       bubbles.push(currentAssistantBubble)
@@ -291,9 +302,11 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
 
     if (event.type === 'tool') {
       currentAssistantBubble.tools.push(event)
+      currentAssistantBubble.events.push(event)
       continue
     }
 
+    currentAssistantBubble.events.push(event)
     currentAssistantBubble.message = event
     currentAssistantBubble = undefined
   }
@@ -306,6 +319,7 @@ const conversationBubbles = computed<ConversationBubble[]>(() => {
       type: 'assistant',
       turnId: lastBubble.message.turnId,
       tools: [],
+      events: [],
     })
   }
 
@@ -358,11 +372,37 @@ function openToolDetail(tool: ConversationToolEvent) {
   toolDetailVisible.value = true
 }
 
+function assistantEventContent(event: ConversationEvent): string {
+  return event.type === 'tool' ? (event.assistantContent ?? '') : event.content
+}
+
 function isToolGroupExpanded(bubbleId: string): boolean {
+  const runningTurn = selectedRunningTurn.value
+  const bubble = conversationBubbles.value.find((item) => item.id === bubbleId)
+
+  if (
+    runningTurn &&
+    bubble?.type === 'assistant' &&
+    bubble.turnId === runningTurn.id
+  ) {
+    return true
+  }
+
   return expandedToolGroups.value[bubbleId] ?? false
 }
 
 function toggleToolGroup(bubbleId: string) {
+  const runningTurn = selectedRunningTurn.value
+  const bubble = conversationBubbles.value.find((item) => item.id === bubbleId)
+
+  if (
+    runningTurn &&
+    bubble?.type === 'assistant' &&
+    bubble.turnId === runningTurn.id
+  ) {
+    return
+  }
+
   expandedToolGroups.value = {
     ...expandedToolGroups.value,
     [bubbleId]: !isToolGroupExpanded(bubbleId),
@@ -1179,16 +1219,17 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   transform: rotate(90deg);
 }
 
-.message__tools-list {
+.message__event-list {
   display: grid;
   gap: 2px;
-  margin-bottom: 10px;
 }
 
-.tool-event__content {
+.message__event {
+  min-width: 0;
+}
+
+.message__event-content {
   padding: 4px 0 2px;
-  color: var(--ui-text-color-secondary);
-  font-size: 12px;
 }
 
 .message__answer-duration {

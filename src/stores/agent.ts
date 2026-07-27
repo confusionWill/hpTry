@@ -721,10 +721,11 @@ export const useAgentStore = defineStore('agent', {
       toolCall: ToolCall,
       reasoningContent?: string,
       assistantContent?: string,
+      replaceVisibleEventId?: string,
     ): Promise<ToolRun> {
       const timestamp = now()
       const run: ToolRun = {
-        id: createId('tool'),
+        id: replaceVisibleEventId ?? createId('tool'),
         conversationId,
         turnId,
         sequence,
@@ -746,7 +747,13 @@ export const useAgentStore = defineStore('agent', {
       events.push(run)
 
       if (this.selectedConversationId === conversationId) {
-        this.events.push(run)
+        const visibleEventIndex = this.events.findIndex((event) => event.id === run.id)
+
+        if (visibleEventIndex >= 0) {
+          this.events.splice(visibleEventIndex, 1, run)
+        } else {
+          this.events.push(run)
+        }
       }
 
       return run
@@ -962,11 +969,20 @@ export const useAgentStore = defineStore('agent', {
           runContext,
           signal: abortController.signal,
           handlers: {
-            createToolRun: (toolCall, stepSequence, reasoningContent, assistantContent) => {
+            createToolRun: async (
+              toolCall,
+              stepSequence,
+              reasoningContent,
+              assistantContent,
+            ) => {
               const sequence = eventSequence
               eventSequence += 1
+              const replaceVisibleEventId =
+                streamingAssistantMessage?.stepSequence === stepSequence
+                  ? streamingAssistantMessage.id
+                  : undefined
 
-              return this.createToolRun(
+              const run = await this.createToolRun(
                 runConversation.id,
                 conversationTurn!.id,
                 sequence,
@@ -975,7 +991,14 @@ export const useAgentStore = defineStore('agent', {
                 toolCall,
                 reasoningContent,
                 assistantContent,
+                replaceVisibleEventId,
               )
+
+              if (replaceVisibleEventId) {
+                streamingAssistantMessage = undefined
+              }
+
+              return run
             },
             updateToolRun: (run, patch) => this.updateToolRun(runContext.events, run, patch),
             writeFile: (path, fileContent) =>
@@ -1010,10 +1033,8 @@ export const useAgentStore = defineStore('agent', {
             cancelStreamRender()
 
             if (streamingAssistantMessage) {
-              removeVisibleMessage(streamingAssistantMessage.id)
+              upsertVisibleMessage(streamingAssistantMessage)
             }
-
-            streamingAssistantMessage = undefined
           },
         })
 
