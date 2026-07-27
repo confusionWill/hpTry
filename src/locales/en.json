@@ -150,7 +150,7 @@
       "streamEndedUnexpectedly": "The streaming response ended unexpectedly. Try again.",
       "streamFailed": "The streaming response failed. Try again."
     },
-    "missing": "Select a provider first."
+    "missing": "Configure a provider first."
   },
   "agent": {
     "emptyFinalMessage": "Tool calls completed, but the model did not return a summary. Check the workspace files on the right."

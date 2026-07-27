@@ -95,6 +95,7 @@ import {
 } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
+import { isTextFile, mimeTypeForPath } from '@/utils/fileType'
 import { formatBytes } from '@/utils/format'
 
 interface UploadedAsset {
@@ -268,7 +269,7 @@ async function uploadFiles(files: File[]) {
           path,
           blob: file,
           name: file.name,
-          mimeType: file.type || 'application/octet-stream',
+          mimeType: file.type || mimeTypeForPath(file.name),
         }
       }),
     )
@@ -296,53 +297,8 @@ function shouldUploadAsText(file: File): boolean {
 }
 
 function isTextUpload(file: File): boolean {
-  const mimeType = file.type.toLowerCase()
-
-  if (mimeType.startsWith('text/')) {
-    return true
-  }
-
-  if (
-    [
-      'application/json',
-      'application/javascript',
-      'application/typescript',
-      'application/xml',
-      'image/svg+xml',
-    ].includes(mimeType)
-  ) {
-    return true
-  }
-
-  return textUploadExtensions.has(extensionForFileName(file.name))
+  return isTextFile(file.name, file.type)
 }
-
-function extensionForFileName(fileName: string): string {
-  return fileName.split('.').pop()?.toLowerCase() ?? ''
-}
-
-const textUploadExtensions = new Set([
-  'cjs',
-  'csv',
-  'css',
-  'env',
-  'htm',
-  'html',
-  'js',
-  'json',
-  'jsx',
-  'md',
-  'mjs',
-  'svg',
-  'toml',
-  'ts',
-  'tsx',
-  'txt',
-  'vue',
-  'xml',
-  'yaml',
-  'yml',
-])
 
 function uniqueUploadPath(fileName: string, existingPaths: Set<string>): string {
   const safeName = normalizeUploadFileName(fileName)
@@ -396,7 +352,7 @@ async function send() {
     return
   }
 
-  if (!store.selectedProvider) {
+  if (!store.selectedProvider?.apiKey.trim()) {
     uiStore.showToast(t('provider.missing'), 'warning')
     return
   }

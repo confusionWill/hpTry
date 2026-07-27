@@ -150,7 +150,7 @@
       "streamEndedUnexpectedly": "流式响应意外中断，请重试。",
       "streamFailed": "流式响应失败，请重试。"
     },
-    "missing": "请先选择供应商。"
+    "missing": "请先完成供应商配置。"
   },
   "agent": {
     "emptyFinalMessage": "工具调用已完成，但模型没有返回总结。请查看右侧工作区文件。"

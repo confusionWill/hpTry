@@ -2,6 +2,24 @@ import JSZip from 'jszip'
 
 import { loadWorkspaceAsset } from '@/services/agent/workspaceFiles'
 import type { Project, WorkspaceFile } from '@/types/agent'
+import { isKnownBinaryFile, isTextFile, mimeTypeForPath } from '@/utils/fileType'
+
+const MANIFEST_PATH = '.hp-project.json'
+
+interface HpProjectManifestFile {
+  path: string
+  kind: 'text' | 'asset'
+  name?: string
+  mimeType?: string
+}
+
+interface HpProjectManifest {
+  format: 'hp-project'
+  version: 1
+  name: string
+  root: string
+  files: HpProjectManifestFile[]
+}
 
 export interface ImportedWorkspaceFile {
   path: string
@@ -49,6 +67,20 @@ export async function exportWorkspaceAsHp(project: Project, files: WorkspaceFile
   }
 
   const exportFiles = files.filter((file) => !file.path.startsWith('.tmp/'))
+  const manifest: HpProjectManifest = {
+    format: 'hp-project',
+    version: 1,
+    name: project.name,
+    root: rootName,
+    files: exportFiles.map((file) => ({
+      path: file.path,
+      kind: file.kind === 'asset' ? 'asset' : 'text',
+      name: file.name,
+      mimeType: file.mimeType,
+    })),
+  }
+
+  zip.file(MANIFEST_PATH, JSON.stringify(manifest))
 
   for (const file of exportFiles.slice().sort((a, b) => a.path.localeCompare(b.path))) {
     if (file.kind === 'asset') {
@@ -72,24 +104,34 @@ function nameFromArchive(fileName: string): string {
   return fileName.replace(/\.hp$/i, '').trim() || 'hpTry project'
 }
 
-function mimeTypeForPath(path: string): string {
-  const extension = path.split('.').pop()?.toLowerCase()
-  const mimeTypes: Record<string, string> = {
-    avif: 'image/avif',
-    gif: 'image/gif',
-    jpeg: 'image/jpeg',
-    jpg: 'image/jpeg',
-    mp3: 'audio/mpeg',
-    mp4: 'video/mp4',
-    pdf: 'application/pdf',
-    png: 'image/png',
-    webm: 'video/webm',
-    webp: 'image/webp',
-    woff: 'font/woff',
-    woff2: 'font/woff2',
+function isManifestFile(value: unknown): value is HpProjectManifestFile {
+  if (!value || typeof value !== 'object') {
+    return false
   }
 
-  return (extension && mimeTypes[extension]) || 'application/octet-stream'
+  const file = value as Partial<HpProjectManifestFile>
+  return (
+    typeof file.path === 'string' &&
+    (file.kind === 'text' || file.kind === 'asset') &&
+    (file.name === undefined || typeof file.name === 'string') &&
+    (file.mimeType === undefined || typeof file.mimeType === 'string')
+  )
+}
+
+function isHpProjectManifest(value: unknown): value is HpProjectManifest {
+  if (!value || typeof value !== 'object') {
+    return false
+  }
+
+  const manifest = value as Partial<HpProjectManifest>
+  return (
+    manifest.format === 'hp-project' &&
+    manifest.version === 1 &&
+    typeof manifest.name === 'string' &&
+    typeof manifest.root === 'string' &&
+    Array.isArray(manifest.files) &&
+    manifest.files.every(isManifestFile)
+  )
 }
 
 function isBinaryContent(bytes: Uint8Array): boolean {
@@ -107,16 +149,31 @@ function isBinaryContent(bytes: Uint8Array): boolean {
 
 export async function importWorkspaceFromHp(file: File): Promise<ImportedWorkspace> {
   const zip = await JSZip.loadAsync(file)
-  const archiveEntries = Object.values(zip.files).filter((entry) => !entry.dir)
+  const manifestEntry = zip.file(MANIFEST_PATH)
+  let manifest: HpProjectManifest | undefined
+
+  if (manifestEntry) {
+    const parsed: unknown = JSON.parse(await manifestEntry.async('string'))
+    if (!isHpProjectManifest(parsed)) {
+      throw new Error('Invalid HP project manifest')
+    }
+    manifest = parsed
+  }
+
+  const archiveEntries = Object.values(zip.files).filter(
+    (entry) => !entry.dir && entry.name !== MANIFEST_PATH,
+  )
   if (archiveEntries.length === 0) {
     throw new Error('HP project contains no files')
   }
 
   const roots = new Set(archiveEntries.map((entry) => entry.name.split('/')[0]))
   const sharedRoot =
-    roots.size === 1 && archiveEntries.every((entry) => entry.name.includes('/'))
+    manifest?.root ||
+    (roots.size === 1 && archiveEntries.every((entry) => entry.name.includes('/'))
       ? [...roots][0]
-      : ''
+      : '')
+  const metadata = new Map(manifest?.files.map((entry) => [entry.path, entry]) ?? [])
   const importedFiles: ImportedWorkspaceFile[] = []
 
   for (const entry of archiveEntries) {
@@ -130,15 +187,18 @@ export async function importWorkspaceFromHp(file: File): Promise<ImportedWorkspa
     }
 
     const bytes = await entry.async('uint8array')
-    const kind = isBinaryContent(bytes) ? 'asset' : 'text'
+    const fileMetadata = metadata.get(path)
+    const kind =
+      fileMetadata?.kind ??
+      (isTextFile(path) || (!isKnownBinaryFile(path) && !isBinaryContent(bytes)) ? 'text' : 'asset')
 
     if (kind === 'asset') {
-      const mimeType = mimeTypeForPath(path)
+      const mimeType = fileMetadata?.mimeType || mimeTypeForPath(path)
       importedFiles.push({
         path,
         kind,
         blob: new Blob([bytes], { type: mimeType }),
-        name: path.split('/').pop() || path,
+        name: fileMetadata?.name || path.split('/').pop() || path,
         mimeType,
       })
       continue
@@ -152,7 +212,7 @@ export async function importWorkspaceFromHp(file: File): Promise<ImportedWorkspa
   }
 
   return {
-    name: nameFromArchive(file.name),
+    name: manifest?.name.trim() || nameFromArchive(file.name),
     files: importedFiles,
   }
 }

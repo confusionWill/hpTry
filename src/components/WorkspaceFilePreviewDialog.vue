@@ -85,6 +85,7 @@ import UiDialog from '@/components/ui/UiDialog.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import { loadWorkspaceAsset } from '@/services/agent/workspaceFiles'
 import type { WorkspaceFile } from '@/types/agent'
+import { isKnownBinaryFile, mimeTypeForPath } from '@/utils/fileType'
 
 type PreviewType = 'audio' | 'image' | 'pdf' | 'text' | 'unsupported' | 'video'
 
@@ -142,8 +143,7 @@ function getPreviewType(file?: WorkspaceFile): PreviewType {
     return 'unsupported'
   }
 
-  const mimeType = file.mimeType ?? mimeTypeForPath(file.path)
-  const extension = extensionForPath(file.path)
+  const mimeType = file.mimeType ?? mimeTypeForPath(file.path, 'text/plain')
 
   if (mimeType.startsWith('image/')) {
     return 'image'
@@ -165,7 +165,7 @@ function getPreviewType(file?: WorkspaceFile): PreviewType {
     return isTextAsset(file) ? 'text' : 'unsupported'
   }
 
-  return binaryExtensions.has(extension) ? 'unsupported' : 'text'
+  return isKnownBinaryFile(file.path) ? 'unsupported' : 'text'
 }
 
 async function loadAssetPreview(file?: WorkspaceFile) {
@@ -222,7 +222,7 @@ function sourceForMedia(file: WorkspaceFile): string {
     return content
   }
 
-  const mimeType = mimeTypeForPath(file.path)
+  const mimeType = mimeTypeForPath(file.path, 'text/plain')
 
   if (!mimeType) {
     return ''
@@ -241,22 +241,6 @@ function sourceForMedia(file: WorkspaceFile): string {
   return ''
 }
 
-function mimeTypeForPath(path: string): string {
-  const extension = extensionForPath(path)
-
-  return (
-    imageMimeTypes[extension] ??
-    videoMimeTypes[extension] ??
-    audioMimeTypes[extension] ??
-    documentMimeTypes[extension] ??
-    'text/plain'
-  )
-}
-
-function extensionForPath(path: string): string {
-  return path.split('.').pop()?.toLowerCase() ?? ''
-}
-
 function fileNameForPath(path: string): string {
   return path.split('/').pop() ?? path
 }
@@ -265,51 +249,6 @@ function isBase64Content(content: string): boolean {
   return Boolean(content) && /^[A-Za-z0-9+/=]+$/.test(content) && content.length % 4 === 0
 }
 
-const imageMimeTypes: Record<string, string> = {
-  apng: 'image/apng',
-  avif: 'image/avif',
-  gif: 'image/gif',
-  jpeg: 'image/jpeg',
-  jpg: 'image/jpeg',
-  png: 'image/png',
-  svg: 'image/svg+xml',
-  webp: 'image/webp',
-}
-
-const videoMimeTypes: Record<string, string> = {
-  m4v: 'video/mp4',
-  mov: 'video/quicktime',
-  mp4: 'video/mp4',
-  ogv: 'video/ogg',
-  webm: 'video/webm',
-}
-
-const audioMimeTypes: Record<string, string> = {
-  mp3: 'audio/mpeg',
-  ogg: 'audio/ogg',
-  wav: 'audio/wav',
-}
-
-const documentMimeTypes: Record<string, string> = {
-  pdf: 'application/pdf',
-}
-
-const binaryExtensions = new Set([
-  '7z',
-  'bz2',
-  'dmg',
-  'doc',
-  'docx',
-  'exe',
-  'gz',
-  'ppt',
-  'pptx',
-  'rar',
-  'tar',
-  'xls',
-  'xlsx',
-  'zip',
-])
 </script>
 
 <style scoped>
