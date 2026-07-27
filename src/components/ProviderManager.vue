@@ -36,12 +36,19 @@
           class="provider-item"
         >
           <button
+            :aria-label="provider.name"
             class="provider-circle provider-select"
             :class="{ 'provider-circle--active': provider.id === store.selectedProviderId }"
             type="button"
             @click="store.selectProvider(provider.id)"
           >
-            <span>{{ provider.name }}</span>
+            <img
+              v-if="isDefaultProvider(provider)"
+              class="provider-logo"
+              :src="deepSeekLogo"
+              alt=""
+            />
+            <span v-else>{{ provider.name }}</span>
           </button>
           <button
             :aria-label="t('common.edit')"
@@ -94,10 +101,18 @@
   >
     <form @submit.prevent="saveProvider">
       <UiFormItem :label="t('common.name')" required>
-        <UiInput v-model="form.name" :placeholder="t('provider.namePlaceholder')" />
+        <UiInput
+          v-model="form.name"
+          :disabled="isEditingDefaultProvider"
+          :placeholder="t('provider.namePlaceholder')"
+        />
       </UiFormItem>
       <UiFormItem :label="t('provider.baseUrl')" required>
-        <UiInput v-model="form.baseUrl" :placeholder="t('provider.baseUrlPlaceholder')" />
+        <UiInput
+          v-model="form.baseUrl"
+          :disabled="isEditingDefaultProvider"
+          :placeholder="t('provider.baseUrlPlaceholder')"
+        />
       </UiFormItem>
       <UiFormItem :label="t('provider.apiKey')" required>
         <UiInput
@@ -107,12 +122,21 @@
         />
       </UiFormItem>
       <UiFormItem :label="t('provider.model')" required>
-        <UiInput v-model="form.model" :placeholder="t('provider.modelPlaceholder')" />
+        <UiInput
+          v-model="form.model"
+          :disabled="isEditingDefaultProvider"
+          :placeholder="t('provider.modelPlaceholder')"
+        />
       </UiFormItem>
     </form>
 
     <template #footer>
-      <UiButton v-if="editingProviderId" danger text @click="confirmDeleteProvider">
+      <UiButton
+        v-if="editingProviderId && !isEditingDefaultProvider"
+        danger
+        text
+        @click="confirmDeleteProvider"
+      >
         {{ t('common.delete') }}
       </UiButton>
       <span />
@@ -143,6 +167,7 @@ import UiDialog from '@/components/ui/UiDialog.vue'
 import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import deepSeekLogo from '@/assets/deepseek.svg'
 import type { AppLocale } from '@/locales'
 import {
   CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS,
@@ -150,6 +175,7 @@ import {
   ChatCompletionResponseError,
   requestChatCompletion,
 } from '@/services/openai'
+import { isDefaultProvider } from '@/services/providers'
 import { useAgentStore } from '@/stores/agent'
 import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
@@ -191,6 +217,10 @@ const selectedLocale = computed({
 
 const canSave = computed(() =>
   Boolean(form.name.trim() && form.baseUrl.trim() && form.apiKey.trim() && form.model.trim()),
+)
+
+const isEditingDefaultProvider = computed(
+  () => editingProviderId.value !== '' && isDefaultProvider({ id: editingProviderId.value }),
 )
 
 const formTitle = computed(() => (editingProviderId.value ? t('provider.edit') : t('provider.add')))
@@ -420,6 +450,11 @@ async function confirmDeleteProvider() {
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow-wrap: anywhere;
+}
+
+.provider-logo {
+  width: 52px;
+  height: 52px;
 }
 
 .provider-edit {

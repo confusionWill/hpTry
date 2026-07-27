@@ -7,6 +7,12 @@ import {
 } from '@/services/agent/runner'
 import { ChatCompletionRequestError } from '@/services/openai'
 import {
+  createDefaultProvider,
+  DEFAULT_PROVIDER_ID,
+  isDefaultProvider,
+  sortProviders,
+} from '@/services/providers'
+import {
   deleteRecord,
   deleteRecordsByIndex,
   getAllRecords,
@@ -251,7 +257,16 @@ export const useAgentStore = defineStore('agent', {
       try {
         await clearTemporaryWorkspaceFiles()
         this.projects = sortUpdated(await getAllRecords('projects'))
-        this.providers = sortUpdated(await getAllRecords('providers'))
+        const storedProviders = await getAllRecords('providers')
+        const defaultProvider = storedProviders.find(isDefaultProvider)
+
+        if (!defaultProvider) {
+          const provider = createDefaultProvider()
+          await putRecord('providers', provider)
+          storedProviders.push(provider)
+        }
+
+        this.providers = sortProviders(storedProviders)
 
         if (!this.selectedProjectId && this.projects[0]) {
           const savedProjectId = loadSelectedProjectId()
@@ -262,7 +277,7 @@ export const useAgentStore = defineStore('agent', {
         if (!this.selectedProviderId) {
           const savedProviderId = loadSelectedProviderId()
           const provider = this.providers.find((item) => item.id === savedProviderId)
-          this.selectProvider(provider?.id ?? this.providers[0]?.id ?? '')
+          this.selectProvider(provider?.id ?? DEFAULT_PROVIDER_ID)
         }
 
         if (this.selectedProjectId) {
@@ -580,24 +595,33 @@ export const useAgentStore = defineStore('agent', {
     async saveProvider(payload: ProviderPayload, providerId?: string) {
       const timestamp = now()
       const existing = this.providers.find((provider) => provider.id === providerId)
-      const provider: Provider = {
-        id: existing?.id ?? createId('provider'),
-        name: payload.name.trim(),
-        baseUrl: payload.baseUrl.trim(),
-        apiKey: payload.apiKey.trim(),
-        model: payload.model.trim(),
-        createdAt: existing?.createdAt ?? timestamp,
-        updatedAt: timestamp,
-      }
+      const provider = isDefaultProvider({ id: providerId ?? '' })
+        ? {
+            ...createDefaultProvider(payload.apiKey.trim(), timestamp),
+            createdAt: existing?.createdAt ?? timestamp,
+          }
+        : {
+            id: existing?.id ?? createId('provider'),
+            name: payload.name.trim(),
+            baseUrl: payload.baseUrl.trim(),
+            apiKey: payload.apiKey.trim(),
+            model: payload.model.trim(),
+            createdAt: existing?.createdAt ?? timestamp,
+            updatedAt: timestamp,
+          }
 
       await putRecord('providers', provider)
-      this.providers = sortUpdated([
+      this.providers = sortProviders([
         ...this.providers.filter((item) => item.id !== provider.id),
         provider,
       ])
       this.selectProvider(provider.id)
     },
     async deleteProvider(providerId: string) {
+      if (providerId === DEFAULT_PROVIDER_ID) {
+        return
+      }
+
       await deleteRecord('providers', providerId)
       this.providers = this.providers.filter((provider) => provider.id !== providerId)
       this.selectProvider(this.providers[0]?.id ?? '')

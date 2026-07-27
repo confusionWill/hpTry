@@ -28,7 +28,7 @@
       "description": "Choose the language used throughout the interface",
       "placeholder": "Select a language",
       "options": {
-        "zhCN": "Simplified Chinese",
+        "zhCN": "简体中文",
         "en": "English"
       }
     }
