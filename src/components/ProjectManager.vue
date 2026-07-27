@@ -6,6 +6,25 @@
     show-header
     @closed="resetCreateForm"
   >
+    <template #header>
+      <h2 class="project-manager__title">
+        {{ t('project.manage') }}
+      </h2>
+      <input
+        ref="projectFileInput"
+        accept=".hp"
+        class="project-open__input"
+        type="file"
+        @change="openProject"
+      />
+      <UiButton :loading="opening" @click="projectFileInput?.click()">
+        <template #icon>
+          <FolderOpen :size="16" />
+        </template>
+        {{ t('project.open') }}
+      </UiButton>
+    </template>
+
     <div class="project-manager">
       <div v-if="store.projects.length > 0" class="project-list">
         <div
@@ -51,23 +70,6 @@
       </div>
 
       <UiEmpty v-else :description="t('project.empty')" :image-size="72" />
-
-      <div class="project-open">
-        <input
-          ref="projectFileInput"
-          accept=".hp"
-          class="project-open__input"
-          type="file"
-          @change="openProject"
-        />
-        <UiButton :loading="opening" @click="projectFileInput?.click()">
-          <template #icon>
-            <FolderOpen :size="16" />
-          </template>
-          {{ t('project.open') }}
-        </UiButton>
-        <span class="project-open__hint">{{ t('project.openHint') }}</span>
-      </div>
 
       <form class="project-create" @submit.prevent="createProject">
         <div class="project-create__heading">
@@ -298,6 +300,13 @@ async function confirmDeleteProject(projectId: string) {
   gap: 18px;
 }
 
+.project-manager__title {
+  margin: 0;
+  color: var(--ui-text-color-primary);
+  font-size: 16px;
+  font-weight: normal;
+}
+
 .project-list {
   display: flex;
   max-height: min(46vh, 360px);
@@ -421,28 +430,16 @@ async function confirmDeleteProject(projectId: string) {
 }
 
 .project-create {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  border-top: 1px solid var(--ui-border-color-light);
-  padding-top: 16px;
-}
-
-.project-open {
-  display: flex;
+  display: grid;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   border-top: 1px solid var(--ui-border-color-light);
+  grid-template-columns: auto minmax(0, 1fr);
   padding-top: 16px;
 }
 
 .project-open__input {
   display: none;
-}
-
-.project-open__hint {
-  color: var(--ui-text-color-secondary);
-  font-size: 13px;
 }
 
 .project-create__heading {
@@ -456,6 +453,7 @@ async function confirmDeleteProject(projectId: string) {
 
 .project-create__controls {
   display: grid;
+  min-width: 0;
   gap: 8px;
   grid-template-columns: minmax(0, 1fr) auto;
 }
