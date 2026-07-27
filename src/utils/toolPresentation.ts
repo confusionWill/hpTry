@@ -55,7 +55,7 @@ const toolPresentations: Record<AgentToolName, ToolPresentation> = {
       const files = Array.isArray(output.files) ? output.files.length : undefined
       return files === undefined
         ? t('conversation.toolSummary.listFiles')
-        : t('conversation.toolSummary.listFilesWithCount', { count: files })
+        : t('conversation.toolSummary.listFilesWithCount', files)
     },
   },
   search_files: {
@@ -66,7 +66,7 @@ const toolPresentations: Record<AgentToolName, ToolPresentation> = {
         (Array.isArray(output.matches) ? output.matches.length : undefined)
       return matches === undefined
         ? t('conversation.toolSummary.searchFiles')
-        : t('conversation.toolSummary.searchFilesWithCount', { count: matches })
+        : t('conversation.toolSummary.searchFilesWithCount', matches)
     },
   },
   read_files: {
@@ -75,7 +75,7 @@ const toolPresentations: Record<AgentToolName, ToolPresentation> = {
       const files = Array.isArray(output.files) ? output.files.length : undefined
       return files === undefined
         ? t('conversation.toolSummary.readFiles')
-        : t('conversation.toolSummary.readFilesWithCount', { count: files })
+        : t('conversation.toolSummary.readFilesWithCount', files)
     },
   },
   write_file: {
@@ -121,10 +121,11 @@ const toolPresentations: Record<AgentToolName, ToolPresentation> = {
       const replacements = getNumber(output, 'replacements')
 
       if (path && replacements !== undefined) {
-        return t('conversation.toolSummary.replaceInFileWithCount', {
-          path,
-          count: replacements,
-        })
+        return t(
+          'conversation.toolSummary.replaceInFileWithCount',
+          { path },
+          replacements,
+        )
       }
 
       return path

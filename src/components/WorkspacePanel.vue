@@ -26,7 +26,7 @@
           <ChevronRight v-else :size="14" />
           <span>{{ t('workspace.files') }}</span>
         </span>
-        <span>{{ t('workspace.fileCount', { count: store.workspaceFiles.length }) }}</span>
+        <span>{{ t('workspace.fileCount', store.workspaceFiles.length) }}</span>
       </button>
     </section>
 

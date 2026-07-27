@@ -59,6 +59,7 @@
         </div>
         <div class="project-create__controls">
           <UiInput
+            ref="projectNameInput"
             v-model="projectName"
             :aria-label="t('common.name')"
             :placeholder="t('project.namePlaceholder')"
@@ -79,7 +80,7 @@
 
 <script setup lang="ts">
 import { FolderKanban, Pencil, Plus, Trash2 } from '@lucide/vue'
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
@@ -95,14 +96,24 @@ const visible = defineModel<boolean>({ required: true })
 const store = useAgentStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
-const projectName = ref(t('project.untitled'))
+const projectName = ref('')
 const creating = ref(false)
 const editingProjectId = ref('')
 const editingProjectName = ref('')
 const renameInput = ref<HTMLInputElement | null>(null)
+const projectNameInput = ref<{ focus: () => void } | null>(null)
+
+watch(visible, async (isVisible) => {
+  if (!isVisible) {
+    return
+  }
+
+  await nextTick()
+  projectNameInput.value?.focus()
+})
 
 function resetCreateForm() {
-  projectName.value = t('project.untitled')
+  projectName.value = ''
   cancelRenaming()
 }
 

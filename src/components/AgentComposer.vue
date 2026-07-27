@@ -288,7 +288,7 @@ async function uploadFiles(files: File[]) {
 
     uploadedAssets.value = [...uploadedAssets.value, ...uploaded]
     if (store.selectedProjectId === projectId) {
-      uiStore.showToast(t('conversation.upload.uploaded', { count: uploaded.length }), 'success')
+      uiStore.showToast(t('conversation.upload.uploaded', uploaded.length), 'success')
     }
   } catch (error) {
     const message = error instanceof Error ? error.message : t('conversation.upload.failed')

@@ -118,7 +118,7 @@
                       v-if="bubble.tools.length > 0"
                       class="message__tools-toggle"
                       type="button"
-                      :aria-label="t('conversation.toolGroup', { count: bubble.tools.length })"
+                      :aria-label="t('conversation.toolGroup', bubble.tools.length)"
                       :aria-expanded="isToolGroupExpanded(bubble.id)"
                       @click="toggleToolGroup(bubble.id)"
                     >

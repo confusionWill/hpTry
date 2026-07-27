@@ -1,5 +1,6 @@
 <template>
   <input
+    ref="inputRef"
     class="ui-input"
     :disabled="disabled"
     :placeholder="placeholder"
@@ -10,7 +11,10 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 const model = defineModel<string>({ required: true })
+const inputRef = ref<HTMLInputElement | null>(null)
 
 withDefaults(
   defineProps<{
@@ -28,6 +32,14 @@ withDefaults(
 function handleInput(event: Event) {
   model.value = (event.target as HTMLInputElement).value
 }
+
+function focus(): void {
+  inputRef.value?.focus()
+}
+
+defineExpose({
+  focus,
+})
 </script>
 
 <style scoped>

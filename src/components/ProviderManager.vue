@@ -3,20 +3,41 @@
     v-model="visible"
     :aria-label="t('common.settings')"
     width="50vw"
-    @closed="resetForm"
+    @closed="resetSettingsDialog"
   >
-    <div class="provider-picker">
-      <div
-        v-for="provider in store.providers"
-        :key="provider.id"
-        class="provider-item"
+    <div class="settings-tabs" role="tablist" :aria-label="t('common.settings')">
+      <button
+        v-for="tab in settingsTabs"
+        :id="`settings-tab-${tab.value}`"
+        :key="tab.value"
+        class="settings-tab"
+        :class="{ 'settings-tab--active': activeTab === tab.value }"
+        type="button"
+        role="tab"
+        :aria-controls="`settings-panel-${tab.value}`"
+        :aria-selected="activeTab === tab.value"
+        @click="activeTab = tab.value"
       >
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <section
+      v-if="activeTab === 'model'"
+      id="settings-panel-model"
+      class="settings-panel"
+      role="tabpanel"
+      aria-labelledby="settings-tab-model"
+    >
+      <div class="provider-picker">
         <div
-          class="provider-circle"
-          :class="{ 'provider-circle--active': provider.id === store.selectedProviderId }"
+          v-for="provider in store.providers"
+          :key="provider.id"
+          class="provider-item"
         >
           <button
-            class="provider-select"
+            class="provider-circle provider-select"
+            :class="{ 'provider-circle--active': provider.id === store.selectedProviderId }"
             type="button"
             @click="store.selectProvider(provider.id)"
           >
@@ -31,17 +52,38 @@
             <Edit3 :size="16" />
           </button>
         </div>
-      </div>
 
-      <button
-        :aria-label="t('provider.add')"
-        class="provider-circle provider-circle--add"
-        type="button"
-        @click="startCreate"
-      >
-        <Plus :size="30" />
-      </button>
-    </div>
+        <button
+          :aria-label="t('provider.add')"
+          class="provider-circle provider-circle--add"
+          type="button"
+          @click="startCreate"
+        >
+          <Plus :size="30" />
+        </button>
+      </div>
+    </section>
+
+    <section
+      v-else
+      id="settings-panel-general"
+      class="settings-panel settings-panel--general"
+      role="tabpanel"
+      aria-labelledby="settings-tab-general"
+    >
+      <div class="general-setting">
+        <div class="general-setting__copy">
+          <h3>{{ t('settings.language.title') }}</h3>
+          <p>{{ t('settings.language.description') }}</p>
+        </div>
+        <UiSelect
+          v-model="selectedLocale"
+          class="general-setting__control"
+          :options="localeOptions"
+          :placeholder="t('settings.language.placeholder')"
+        />
+      </div>
+    </section>
   </UiDialog>
 
   <UiDialog
@@ -100,6 +142,8 @@ import UiButton from '@/components/ui/UiButton.vue'
 import UiDialog from '@/components/ui/UiDialog.vue'
 import UiFormItem from '@/components/ui/UiFormItem.vue'
 import UiInput from '@/components/ui/UiInput.vue'
+import UiSelect, { type UiSelectOption } from '@/components/ui/UiSelect.vue'
+import type { AppLocale } from '@/locales'
 import {
   CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS,
   ChatCompletionRequestError,
@@ -107,14 +151,19 @@ import {
   requestChatCompletion,
 } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
+import { useSettingsStore } from '@/stores/settings'
 import { useUiStore } from '@/stores/ui'
 import type { Provider } from '@/types/agent'
+
+type SettingsTab = 'model' | 'general'
 
 const visible = defineModel<boolean>({ required: true })
 
 const store = useAgentStore()
+const settingsStore = useSettingsStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
+const activeTab = ref<SettingsTab>('model')
 const formVisible = ref(false)
 const editingProviderId = ref('')
 const testingProvider = ref(false)
@@ -125,11 +174,30 @@ const form = reactive({
   model: '',
 })
 
+const settingsTabs = computed(() => [
+  { label: t('settings.tabs.model'), value: 'model' as const },
+  { label: t('settings.tabs.general'), value: 'general' as const },
+])
+
+const localeOptions = computed<UiSelectOption[]>(() => [
+  { label: t('settings.language.options.zhCN'), value: 'zh-CN' },
+  { label: t('settings.language.options.en'), value: 'en' },
+])
+
+const selectedLocale = computed({
+  get: () => settingsStore.locale,
+  set: (value: string) => settingsStore.setLocale(value as AppLocale),
+})
+
 const canSave = computed(() =>
   Boolean(form.name.trim() && form.baseUrl.trim() && form.apiKey.trim() && form.model.trim()),
 )
 
 const formTitle = computed(() => (editingProviderId.value ? t('provider.edit') : t('provider.add')))
+
+function resetSettingsDialog() {
+  activeTab.value = 'model'
+}
 
 function resetForm() {
   editingProviderId.value = ''
@@ -254,9 +322,57 @@ async function confirmDeleteProvider() {
 </script>
 
 <style scoped>
+.settings-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 4px;
+}
+
+.settings-tab {
+  position: relative;
+  min-width: 76px;
+  border: 0;
+  background: transparent;
+  color: var(--ui-text-color-secondary);
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 14px 11px;
+}
+
+.settings-tab::after {
+  position: absolute;
+  right: 12px;
+  bottom: -1px;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: transparent;
+  content: '';
+}
+
+.settings-tab:hover,
+.settings-tab:focus-visible,
+.settings-tab--active {
+  color: var(--ui-color-primary);
+}
+
+.settings-tab:focus-visible {
+  border-radius: 6px;
+  outline: 2px solid var(--ui-color-primary-light-5);
+  outline-offset: -2px;
+}
+
+.settings-tab--active::after {
+  background: var(--ui-color-primary);
+}
+
+.settings-panel {
+  min-height: 50vh;
+}
+
 .provider-picker {
   display: flex;
-  min-height: 50vh;
+  min-height: inherit;
   align-items: center;
   justify-content: center;
   gap: 22px;
@@ -265,6 +381,7 @@ async function confirmDeleteProvider() {
 }
 
 .provider-item {
+  position: relative;
   display: block;
 }
 
@@ -286,18 +403,8 @@ async function confirmDeleteProvider() {
 
 .provider-select {
   display: grid;
-  width: 100%;
-  height: 100%;
   place-items: center;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-  line-height: 1.2;
   padding: 10px;
-  text-align: center;
 }
 
 .provider-circle:hover,
@@ -349,6 +456,53 @@ async function confirmDeleteProvider() {
 
 .provider-circle--add {
   font-size: 30px;
+}
+
+.settings-panel--general {
+  padding: 28px 4px;
+}
+
+.general-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 0 12px 24px;
+}
+
+.general-setting__copy {
+  min-width: 0;
+}
+
+.general-setting__copy h3 {
+  margin: 0 0 6px;
+  color: var(--ui-text-color-primary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.general-setting__copy p {
+  margin: 0;
+  color: var(--ui-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.general-setting__control {
+  width: min(220px, 42%);
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .general-setting {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .general-setting__control {
+    width: 100%;
+  }
 }
 
 </style>

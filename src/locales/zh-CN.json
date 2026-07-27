@@ -18,6 +18,21 @@
     "settings": "设置",
     "close": "关闭"
   },
+  "settings": {
+    "tabs": {
+      "model": "模型",
+      "general": "常规"
+    },
+    "language": {
+      "title": "语言",
+      "description": "选择界面显示语言",
+      "placeholder": "选择语言",
+      "options": {
+        "zhCN": "简体中文",
+        "en": "英语"
+      }
+    }
+  },
   "project": {
     "title": "项目",
     "manage": "项目管理",
@@ -25,7 +40,6 @@
     "create": "创建项目",
     "selectPlaceholder": "选择项目",
     "namePlaceholder": "项目名称",
-    "untitled": "未命名",
     "running": "运行中",
     "empty": "暂无项目",
     "emptyTitle": "先创建项目",

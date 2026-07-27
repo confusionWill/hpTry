@@ -18,6 +18,21 @@
     "settings": "Settings",
     "close": "Close"
   },
+  "settings": {
+    "tabs": {
+      "model": "Model",
+      "general": "General"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Choose the language used throughout the interface",
+      "placeholder": "Select a language",
+      "options": {
+        "zhCN": "Simplified Chinese",
+        "en": "English"
+      }
+    }
+  },
   "project": {
     "title": "Projects",
     "manage": "Manage projects",
@@ -25,7 +40,6 @@
     "create": "Create project",
     "selectPlaceholder": "Select project",
     "namePlaceholder": "Project name",
-    "untitled": "Untitled",
     "running": "Running",
     "empty": "No projects",
     "emptyTitle": "Create a project first",
@@ -64,12 +78,12 @@
       "selectFiles": "Upload assets",
       "removeFile": "Delete uploaded file {name}",
       "removeFailed": "Failed to delete uploaded file",
-      "uploaded": "Uploaded {count} assets to .tmp.",
+      "uploaded": "Uploaded {count} asset to .tmp. | Uploaded {count} assets to .tmp.",
       "failed": "Upload failed",
       "missingProject": "Select a project first.",
       "messageHeading": ".tmp assets:"
     },
-    "toolGroup": "{count} tool calls",
+    "toolGroup": "{count} tool call | {count} tool calls",
     "toolEventLabel": "{name}: {summary}, {status}",
     "toolInput": "Input",
     "toolOutput": "Output",
@@ -80,11 +94,11 @@
     "toolSummary": {
       "generic": "Run tool",
       "listFiles": "List files",
-      "listFilesWithCount": "List {count} files",
+      "listFilesWithCount": "List {count} file | List {count} files",
       "searchFiles": "Search files",
-      "searchFilesWithCount": "Search files, {count} matches",
+      "searchFilesWithCount": "Search files, {count} match | Search files, {count} matches",
       "readFiles": "Read files",
-      "readFilesWithCount": "Read {count} files",
+      "readFilesWithCount": "Read {count} file | Read {count} files",
       "writeFile": "Write {path}",
       "writeFileWithBytes": "Write {path}, {bytes}",
       "writeFileFallback": "Write file",
@@ -92,7 +106,7 @@
       "editFileWithBytes": "Edit {path}, {bytes}",
       "editFileFallback": "Edit file",
       "replaceInFile": "Replace in {path}",
-      "replaceInFileWithCount": "Replace in {path}, {count} replacements",
+      "replaceInFileWithCount": "Replace in {path}, {count} replacement | Replace in {path}, {count} replacements",
       "replaceInFileFallback": "Replace in file",
       "deleteFile": "Delete {path}",
       "deleteFileFallback": "Delete file",
@@ -139,7 +153,7 @@
   },
   "workspace": {
     "title": "Workspace",
-    "fileCount": "{count} files",
+    "fileCount": "{count} file | {count} files",
     "files": "Files",
     "preview": "Content",
     "emptyFiles": "No files yet",
