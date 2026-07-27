@@ -14,7 +14,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
 
-  if (!url.pathname.startsWith(PREVIEW_PREFIX)) {
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(PREVIEW_PREFIX)) {
     return
   }
 
