@@ -52,6 +52,23 @@
 
       <UiEmpty v-else :description="t('project.empty')" :image-size="72" />
 
+      <div class="project-open">
+        <input
+          ref="projectFileInput"
+          accept=".hp"
+          class="project-open__input"
+          type="file"
+          @change="openProject"
+        />
+        <UiButton :loading="opening" @click="projectFileInput?.click()">
+          <template #icon>
+            <FolderOpen :size="16" />
+          </template>
+          {{ t('project.open') }}
+        </UiButton>
+        <span class="project-open__hint">{{ t('project.openHint') }}</span>
+      </div>
+
       <form class="project-create" @submit.prevent="createProject">
         <div class="project-create__heading">
           <Plus :size="17" aria-hidden="true" />
@@ -79,7 +96,7 @@
 </template>
 
 <script setup lang="ts">
-import { FolderKanban, Pencil, Plus, Trash2 } from '@lucide/vue'
+import { FolderKanban, FolderOpen, Pencil, Plus, Trash2 } from '@lucide/vue'
 import { nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
@@ -102,6 +119,8 @@ const editingProjectId = ref('')
 const editingProjectName = ref('')
 const renameInput = ref<HTMLInputElement | null>(null)
 const projectNameInput = ref<{ focus: () => void } | null>(null)
+const projectFileInput = ref<HTMLInputElement | null>(null)
+const opening = ref(false)
 
 watch(visible, async (isVisible) => {
   if (!isVisible) {
@@ -216,6 +235,31 @@ async function createProject() {
     visible.value = false
   } finally {
     creating.value = false
+  }
+}
+
+async function openProject(event: Event) {
+  const input = event.target
+  if (!(input instanceof HTMLInputElement)) {
+    return
+  }
+
+  const file = input.files?.[0]
+  input.value = ''
+
+  if (!file || opening.value) {
+    return
+  }
+
+  opening.value = true
+  try {
+    await store.importProject(file)
+    visible.value = false
+    uiStore.showToast(t('project.openSuccess', { name: store.selectedProject?.name ?? file.name }))
+  } catch {
+    uiStore.showToast(t('project.openFailed'), 'error')
+  } finally {
+    opening.value = false
   }
 }
 
@@ -382,6 +426,23 @@ async function confirmDeleteProject(projectId: string) {
   gap: 10px;
   border-top: 1px solid var(--ui-border-color-light);
   padding-top: 16px;
+}
+
+.project-open {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--ui-border-color-light);
+  padding-top: 16px;
+}
+
+.project-open__input {
+  display: none;
+}
+
+.project-open__hint {
+  color: var(--ui-text-color-secondary);
+  font-size: 13px;
 }
 
 .project-create__heading {

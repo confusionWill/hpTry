@@ -1,10 +1,10 @@
 <template>
   <UiButton
     :disabled="store.workspaceFiles.length === 0"
-    :loading="store.exportingZip"
-    :aria-label="t('workspace.exportZip')"
+    :loading="store.exportingHp"
+    :aria-label="t('workspace.exportHp')"
     circle
-    @click="exportZip"
+    @click="exportHp"
   >
     <template #icon>
       <Download :size="16" />
@@ -24,9 +24,9 @@ const store = useAgentStore()
 const uiStore = useUiStore()
 const { t } = useI18n()
 
-async function exportZip() {
+async function exportHp() {
   try {
-    await store.exportCurrentWorkspaceZip()
+    await store.exportCurrentWorkspaceHp()
   } catch (error) {
     const message = error instanceof Error ? error.message : t('workspace.exportFailed')
     uiStore.showToast(message || t('workspace.exportFailed'), 'error')

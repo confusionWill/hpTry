@@ -32,7 +32,7 @@ import {
   upsertProjectWorkspaceFile,
 } from '@/services/agent/workspaceFiles'
 import { initializePresentationWorkspace } from '@/services/agent/presentationTemplate'
-import { exportWorkspaceAsZip } from '@/services/agent/workspaceExport'
+import { exportWorkspaceAsHp, importWorkspaceFromHp } from '@/services/agent/workspaceExport'
 import type {
   ChatMessage,
   Conversation,
@@ -191,7 +191,7 @@ export const useAgentStore = defineStore('agent', {
     selectedWorkspaceFilePath: '',
     draftConversationProjectId: '',
     loading: false,
-    exportingZip: false,
+    exportingHp: false,
     activeRuns: [] as ActiveAgentRun[],
     stoppingConversationIds: [] as string[],
     projectLoadToken: 0,
@@ -359,6 +359,51 @@ export const useAgentStore = defineStore('agent', {
 
       try {
         await initializePresentationWorkspace(project.id, project.name)
+      } catch (error) {
+        await deleteRecordsByIndex('workspaceFiles', 'projectId', project.id)
+        await deleteRecordsByIndex('workspaceAssets', 'projectId', project.id)
+        await deleteRecord('projects', project.id)
+        throw error
+      }
+
+      this.projects = sortUpdated([...this.projects, project])
+      await this.selectProject(project.id, true)
+    },
+    async importProject(file: File) {
+      const imported = await importWorkspaceFromHp(file)
+      const timestamp = now()
+      const project: Project = {
+        id: createId('project'),
+        name: imported.name,
+        description: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }
+      const workspaceFiles: WorkspaceFile[] = []
+
+      await putRecord('projects', project)
+
+      try {
+        for (const importedFile of imported.files) {
+          if (importedFile.kind === 'asset' && importedFile.blob) {
+            await upsertProjectWorkspaceAsset(
+              project.id,
+              workspaceFiles,
+              importedFile.path,
+              importedFile.blob,
+              importedFile.name ?? importedFile.path.split('/').pop() ?? importedFile.path,
+              importedFile.mimeType ?? 'application/octet-stream',
+            )
+            continue
+          }
+
+          await upsertProjectWorkspaceFile(
+            project.id,
+            workspaceFiles,
+            importedFile.path,
+            importedFile.content ?? '',
+          )
+        }
       } catch (error) {
         await deleteRecordsByIndex('workspaceFiles', 'projectId', project.id)
         await deleteRecordsByIndex('workspaceAssets', 'projectId', project.id)
@@ -1146,16 +1191,16 @@ export const useAgentStore = defineStore('agent', {
         activeRunControllers.delete(runConversation.id)
       }
     },
-    async exportCurrentWorkspaceZip() {
+    async exportCurrentWorkspaceHp() {
       if (!this.selectedProject || this.workspaceFiles.length === 0) {
         return
       }
 
-      this.exportingZip = true
+      this.exportingHp = true
       try {
-        await exportWorkspaceAsZip(this.selectedProject, this.workspaceFiles)
+        await exportWorkspaceAsHp(this.selectedProject, this.workspaceFiles)
       } finally {
-        this.exportingZip = false
+        this.exportingHp = false
       }
     },
   },
