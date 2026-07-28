@@ -302,8 +302,11 @@ export const useAgentStore = defineStore('agent', {
       }
 
       this.conversations = conversations
-      this.selectedConversationId = startNewConversation ? '' : (this.conversations[0]?.id ?? '')
-      this.draftConversationProjectId = startNewConversation ? projectId : ''
+      const shouldStartNewConversation = startNewConversation || this.conversations.length === 0
+      this.selectedConversationId = shouldStartNewConversation
+        ? ''
+        : (this.conversations[0]?.id ?? '')
+      this.draftConversationProjectId = shouldStartNewConversation ? projectId : ''
       this.turns = []
       this.events = []
       this.hasOlderTurns = false
@@ -598,6 +601,8 @@ export const useAgentStore = defineStore('agent', {
         (conversation) => conversation.id !== conversationId,
       )
       this.selectedConversationId = this.conversations[0]?.id ?? ''
+      this.draftConversationProjectId =
+        this.conversations.length === 0 ? this.selectedProjectId : ''
       this.turns = []
       this.events = []
       this.hasOlderTurns = false
