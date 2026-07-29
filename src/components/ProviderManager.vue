@@ -249,7 +249,6 @@ function editProvider(providerId: string) {
     return
   }
 
-  store.selectProvider(provider.id)
   editingProviderId.value = provider.id
   form.name = provider.name
   form.baseUrl = provider.baseUrl
