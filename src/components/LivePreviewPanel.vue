@@ -74,6 +74,13 @@
             tabindex="-1"
             :title="t('workspace.livePreview.title')"
           />
+          <button
+            v-if="!agentStore.isSelectedProjectRunning && !isPreviewFocused"
+            class="live-preview__focus-shield"
+            type="button"
+            :aria-label="t('workspace.livePreview.focusHint')"
+            @click="focusPreviewFrame"
+          />
           <div
             v-if="agentStore.isSelectedProjectRunning"
             aria-live="polite"
@@ -608,6 +615,7 @@ function schedulePreviewFocusSync() {
     previewFocusSyncTimer = null
     const nextFocused =
       !agentStore.isSelectedProjectRunning &&
+      document.hasFocus() &&
       document.activeElement === previewFrameRef.value
 
     if (nextFocused !== isPreviewFocused.value) {
@@ -732,6 +740,16 @@ function clearPreviewFocusHint() {
 
 .live-preview__frame--updating {
   pointer-events: none;
+}
+
+.live-preview__focus-shield {
+  position: absolute;
+  z-index: 1;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: default;
+  inset: 0;
 }
 
 .live-preview__updating {

@@ -79,6 +79,8 @@
     "loadingOlder": "正在加载更早的消息…",
     "upload": {
       "selectFiles": "上传资源",
+      "dropTitle": "松开即可上传",
+      "dropHint": "支持同时上传多个文件",
       "removeFile": "删除已上传文件 {name}",
       "removeFailed": "删除已上传文件失败",
       "uploaded": "已上传 {count} 个资源到临时区。",

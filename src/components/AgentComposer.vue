@@ -1,13 +1,5 @@
 <template>
-  <div
-    v-if="canChat"
-    class="agent-composer"
-    :class="{ 'agent-composer--dragging': isDraggingFiles }"
-    @dragenter.prevent="handleDragEnter"
-    @dragover.prevent="handleDragOver"
-    @dragleave="handleDragLeave"
-    @drop.prevent="handleDrop"
-  >
+  <div v-if="canChat" class="agent-composer">
     <input
       ref="fileInputRef"
       class="agent-composer__file-input"
@@ -77,12 +69,31 @@
         </template>
       </UiButton>
     </div>
+
+    <Teleport :to="uploadOverlayTarget">
+      <div
+        v-if="isDraggingFiles"
+        class="upload-drop-overlay"
+        role="status"
+        :aria-label="t('conversation.upload.dropTitle')"
+      >
+        <div class="upload-drop-overlay__panel">
+          <UploadCloud :size="42" :stroke-width="1.7" aria-hidden="true" />
+          <strong class="upload-drop-overlay__title">
+            {{ t('conversation.upload.dropTitle') }}
+          </strong>
+          <span class="upload-drop-overlay__hint">
+            {{ t('conversation.upload.dropHint') }}
+          </span>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ArrowUp, Paperclip, Square, X } from '@lucide/vue'
-import { computed, nextTick, ref } from 'vue'
+import { ArrowUp, Paperclip, Square, UploadCloud, X } from '@lucide/vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
@@ -115,6 +126,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const textareaRef = ref<InstanceType<typeof UiTextarea> | null>(null)
 const isDraggingFiles = ref(false)
 const isUploadingFiles = ref(false)
+const uploadOverlayTarget = shallowRef<HTMLElement | string>('body')
 let dragDepth = 0
 
 const canChat = computed(() => Boolean(store.selectedConversationId || store.isDraftConversationActive))
@@ -166,39 +178,73 @@ defineExpose({
   focusComposer,
 })
 
-function handleDragEnter(event: DragEvent) {
-  if (!hasDraggedFiles(event)) {
+function handleWindowDragEnter(event: DragEvent) {
+  if (!canChat.value || !hasDraggedFiles(event)) {
     return
   }
 
+  event.preventDefault()
   dragDepth += 1
   isDraggingFiles.value = true
 }
 
-function handleDragOver(event: DragEvent) {
-  if (!hasDraggedFiles(event)) {
+function handleWindowDragOver(event: DragEvent) {
+  if (!canChat.value || !hasDraggedFiles(event)) {
     return
   }
 
+  event.preventDefault()
   event.dataTransfer!.dropEffect = 'copy'
 }
 
-function handleDragLeave(event: DragEvent) {
-  if (!hasDraggedFiles(event)) {
+function handleWindowDragLeave(event: DragEvent) {
+  if (!isDraggingFiles.value) {
     return
   }
 
+  event.preventDefault()
   dragDepth = Math.max(0, dragDepth - 1)
   isDraggingFiles.value = dragDepth > 0
 }
 
-function handleDrop(event: DragEvent) {
+function handleWindowDrop(event: DragEvent) {
+  if (!hasDraggedFiles(event) && !isDraggingFiles.value) {
+    return
+  }
+
+  event.preventDefault()
   dragDepth = 0
   isDraggingFiles.value = false
+
+  if (!canChat.value) {
+    return
+  }
 
   const files = Array.from(event.dataTransfer?.files ?? [])
   void uploadFiles(files)
 }
+
+function syncUploadOverlayTarget() {
+  uploadOverlayTarget.value =
+    document.fullscreenElement instanceof HTMLElement ? document.fullscreenElement : 'body'
+}
+
+onMounted(() => {
+  window.addEventListener('dragenter', handleWindowDragEnter)
+  window.addEventListener('dragover', handleWindowDragOver)
+  window.addEventListener('dragleave', handleWindowDragLeave)
+  window.addEventListener('drop', handleWindowDrop)
+  document.addEventListener('fullscreenchange', syncUploadOverlayTarget)
+  syncUploadOverlayTarget()
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('dragenter', handleWindowDragEnter)
+  window.removeEventListener('dragover', handleWindowDragOver)
+  window.removeEventListener('dragleave', handleWindowDragLeave)
+  window.removeEventListener('drop', handleWindowDrop)
+  document.removeEventListener('fullscreenchange', syncUploadOverlayTarget)
+})
 
 function handleFileInputChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -436,9 +482,6 @@ function handleComposerAction() {
 <style scoped>
 .agent-composer {
   padding: 14px 18px;
-  transition:
-    background-color 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
 .agent-composer__controls {
@@ -448,11 +491,6 @@ function handleComposerAction() {
   gap: 10px;
   grid-template-columns: auto minmax(0, 1fr) auto;
   margin: 0 auto;
-}
-
-.agent-composer--dragging {
-  background: var(--ui-color-primary-light-9);
-  box-shadow: inset 0 0 0 2px var(--ui-color-primary-light-5);
 }
 
 .agent-composer__file-input {
@@ -539,5 +577,38 @@ function handleComposerAction() {
   min-width: 26px;
   height: 26px;
   min-height: 26px;
+}
+
+.upload-drop-overlay {
+  position: fixed;
+  z-index: 5000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 5vw, 72px);
+  background: rgb(248 250 252 / 88%);
+  backdrop-filter: blur(10px);
+}
+
+.upload-drop-overlay__panel {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+}
+
+.upload-drop-overlay__panel > svg {
+  color: var(--ui-color-primary);
+}
+
+.upload-drop-overlay__title {
+  color: var(--ui-text-color-primary);
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.25;
+}
+
+.upload-drop-overlay__hint {
+  color: var(--ui-text-color-secondary);
+  font-size: 14px;
+  line-height: 1.5;
 }
 </style>
