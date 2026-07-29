@@ -5,7 +5,12 @@
       <WorkspacePanel />
     </aside>
 
-    <section v-if="store.projects.length === 0 && !store.loading" class="project-empty">
+    <section
+      v-if="store.projects.length === 0 && !store.loading"
+      class="project-empty"
+      @dragover.prevent
+      @drop.prevent="importProjectFromDrop"
+    >
       <UiEmpty :description="t('project.emptyTitle')">
         <p>{{ t('project.emptyDescription') }}</p>
       </UiEmpty>
@@ -38,13 +43,18 @@ import ProjectConversationSidebar from '@/components/ProjectConversationSidebar.
 import ProviderManager from '@/components/ProviderManager.vue'
 import WorkspacePanel from '@/components/WorkspacePanel.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
+import { isHpProjectFile, useProjectImport } from '@/composables/useProjectImport'
 import { useAgentStore } from '@/stores/agent'
+import { useUiStore } from '@/stores/ui'
 
 const store = useAgentStore()
+const uiStore = useUiStore()
+const { importProjectFile } = useProjectImport()
 const { t } = useI18n()
 const providerDialogVisible = ref(false)
 const chatPanelCollapsed = ref(false)
 const composerRef = ref<InstanceType<typeof AgentComposer> | null>(null)
+const isImportingProject = ref(false)
 
 onMounted(() => {
   void store.load().then(focusComposer)
@@ -54,6 +64,28 @@ function focusComposer() {
   void nextTick(() => {
     composerRef.value?.focusComposer()
   })
+}
+
+async function importProjectFromDrop(event: DragEvent) {
+  if (isImportingProject.value) {
+    return
+  }
+
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  const file = files.length === 1 ? files[0] : undefined
+
+  if (!file || !isHpProjectFile(file)) {
+    uiStore.showToast(t('project.openFailed'), 'error')
+    return
+  }
+
+  isImportingProject.value = true
+
+  try {
+    await importProjectFile(file)
+  } finally {
+    isImportingProject.value = false
+  }
 }
 
 watch(

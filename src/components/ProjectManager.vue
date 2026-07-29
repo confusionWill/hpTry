@@ -107,6 +107,7 @@ import UiDialog from '@/components/ui/UiDialog.vue'
 import UiEmpty from '@/components/ui/UiEmpty.vue'
 import UiInput from '@/components/ui/UiInput.vue'
 import UiMoreMenu, { type UiMoreMenuItem } from '@/components/ui/UiMoreMenu.vue'
+import { useProjectImport } from '@/composables/useProjectImport'
 import { useAgentStore } from '@/stores/agent'
 import { useUiStore } from '@/stores/ui'
 
@@ -114,6 +115,7 @@ const visible = defineModel<boolean>({ required: true })
 
 const store = useAgentStore()
 const uiStore = useUiStore()
+const { importProjectFile } = useProjectImport()
 const { t } = useI18n()
 const projectName = ref('')
 const creating = ref(false)
@@ -255,11 +257,9 @@ async function openProject(event: Event) {
 
   opening.value = true
   try {
-    await store.importProject(file)
-    visible.value = false
-    uiStore.showToast(t('project.openSuccess', { name: store.selectedProject?.name ?? file.name }))
-  } catch {
-    uiStore.showToast(t('project.openFailed'), 'error')
+    if (await importProjectFile(file)) {
+      visible.value = false
+    }
   } finally {
     opening.value = false
   }

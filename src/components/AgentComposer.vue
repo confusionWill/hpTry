@@ -75,16 +75,10 @@
         v-if="isDraggingFiles"
         class="upload-drop-overlay"
         role="status"
-        :aria-label="t('conversation.upload.dropTitle')"
+        :aria-label="t('conversation.upload.selectFiles')"
       >
         <div class="upload-drop-overlay__panel">
-          <UploadCloud :size="42" :stroke-width="1.7" aria-hidden="true" />
-          <strong class="upload-drop-overlay__title">
-            {{ t('conversation.upload.dropTitle') }}
-          </strong>
-          <span class="upload-drop-overlay__hint">
-            {{ t('conversation.upload.dropHint') }}
-          </span>
+          <UploadCloud :size="52" :stroke-width="1.7" aria-hidden="true" />
         </div>
       </div>
     </Teleport>
@@ -98,6 +92,7 @@ import { useI18n } from 'vue-i18n'
 
 import UiButton from '@/components/ui/UiButton.vue'
 import UiTextarea from '@/components/ui/UiTextarea.vue'
+import { isHpProjectFile, useProjectImport } from '@/composables/useProjectImport'
 import { AGENT_SYSTEM_PROMPT, CONVERSATION_TITLE_PROMPT } from '@/services/agent/prompts'
 import {
   CHAT_COMPLETION_RESPONSE_ERROR_I18N_KEYS,
@@ -119,6 +114,7 @@ const MAX_TEXT_UPLOAD_BYTES = 120_000
 
 const store = useAgentStore()
 const uiStore = useUiStore()
+const { importProjectFile } = useProjectImport()
 const { n, t } = useI18n()
 const draft = ref('')
 const uploadedAssets = ref<UploadedAsset[]>([])
@@ -221,7 +217,7 @@ function handleWindowDrop(event: DragEvent) {
   }
 
   const files = Array.from(event.dataTransfer?.files ?? [])
-  void uploadFiles(files)
+  handleFiles(files)
 }
 
 function syncUploadOverlayTarget() {
@@ -250,11 +246,36 @@ function handleFileInputChange(event: Event) {
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? [])
   input.value = ''
-  void uploadFiles(files)
+  handleFiles(files)
 }
 
 function hasDraggedFiles(event: DragEvent): boolean {
   return Array.from(event.dataTransfer?.types ?? []).includes('Files')
+}
+
+function handleFiles(files: File[]) {
+  const file = files.length === 1 ? files[0] : undefined
+
+  if (file && isHpProjectFile(file)) {
+    void handleProjectImport(file)
+    return
+  }
+
+  void uploadFiles(files)
+}
+
+async function handleProjectImport(file: File) {
+  if (isUploadingFiles.value) {
+    return
+  }
+
+  isUploadingFiles.value = true
+
+  try {
+    await importProjectFile(file)
+  } finally {
+    isUploadingFiles.value = false
+  }
 }
 
 async function removeUploadedAsset(asset: UploadedAsset) {
@@ -593,22 +614,9 @@ function handleComposerAction() {
 .upload-drop-overlay__panel {
   display: grid;
   justify-items: center;
-  gap: 14px;
 }
 
 .upload-drop-overlay__panel > svg {
   color: var(--ui-color-primary);
-}
-
-.upload-drop-overlay__title {
-  color: var(--ui-text-color-primary);
-  font-size: clamp(22px, 3vw, 30px);
-  line-height: 1.25;
-}
-
-.upload-drop-overlay__hint {
-  color: var(--ui-text-color-secondary);
-  font-size: 14px;
-  line-height: 1.5;
 }
 </style>

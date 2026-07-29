@@ -79,8 +79,6 @@
     "loadingOlder": "Loading earlier messages…",
     "upload": {
       "selectFiles": "Upload assets",
-      "dropTitle": "Drop to upload",
-      "dropHint": "You can upload multiple files at once",
       "removeFile": "Delete uploaded file {name}",
       "removeFailed": "Failed to delete uploaded file",
       "uploaded": "Uploaded {count} asset to .tmp. | Uploaded {count} assets to .tmp.",
