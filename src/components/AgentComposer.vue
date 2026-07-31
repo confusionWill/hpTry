@@ -461,16 +461,25 @@ async function send() {
   }
 }
 
-function buildAgentUiContext(): AgentUiContext | undefined {
+function buildAgentUiContext(): AgentUiContext {
   const slides = presentationStore.manifest?.slides
   const page = presentationStore.activeSlidePage
   const path = slides?.[page - 1]?.path
+  const canvasSize = presentationStore.selectedCanvasSize
+  const context: AgentUiContext = {
+    aspectRatio: presentationStore.selectedAspectRatio,
+    canvasSize: {
+      width: canvasSize.width,
+      height: canvasSize.height,
+    },
+  }
 
   if (!slides?.length || !path) {
-    return undefined
+    return context
   }
 
   return {
+    ...context,
     selectedSlide: {
       page,
       total: slides.length,

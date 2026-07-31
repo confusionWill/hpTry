@@ -1,3 +1,8 @@
+import type {
+  PreviewAspectRatioSelection,
+  PreviewCanvasSize,
+} from '@/utils/presentationCanvas'
+
 export type MessageRole = 'system' | 'user' | 'assistant'
 export type ToolRunStatus = 'running' | 'success' | 'error'
 export type ConversationTurnStatus = 'running' | 'completed' | 'error' | 'stopped'
@@ -49,7 +54,9 @@ export interface ConversationMessageEvent extends BaseConversationEvent {
 }
 
 export interface AgentUiContext {
-  selectedSlide: {
+  aspectRatio: PreviewAspectRatioSelection
+  canvasSize: PreviewCanvasSize
+  selectedSlide?: {
     page: number
     total: number
     path: string
