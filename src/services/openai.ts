@@ -343,7 +343,7 @@ export async function requestChatCompletion(params: {
   onTextDelta?: (delta: string, content: string) => void
 }): Promise<ChatCompletionResult> {
   const controller = new AbortController()
-  const timeoutMs = params.timeoutMs ?? 120_000
+  const timeoutMs = params.timeoutMs ?? 600_000
   let timedOut = false
   const timeoutId = window.setTimeout(() => {
     timedOut = true
