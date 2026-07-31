@@ -51,7 +51,6 @@
       </div>
       <UiButton
         circle
-        :danger="currentProjectRunning"
         :disabled="composerActionDisabled"
         :loading="isUploadingFiles"
         variant="primary"

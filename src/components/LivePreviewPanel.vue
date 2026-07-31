@@ -57,7 +57,7 @@
           class="live-preview__viewport"
           :class="{
             'live-preview__viewport--fixed': selectedAspectRatioValue !== null,
-            'live-preview__viewport--focused': isPreviewFocused,
+            'live-preview__viewport--focused': isPreviewFocused && !isPreviewFullscreen,
           }"
           :style="previewViewportStyle"
         >
@@ -75,7 +75,11 @@
             :title="t('workspace.livePreview.title')"
           />
           <button
-            v-if="!agentStore.isSelectedProjectRunning && !isPreviewFocused"
+            v-if="
+              !agentStore.isSelectedProjectRunning &&
+              !isPreviewFocused &&
+              !isPreviewFullscreen
+            "
             class="live-preview__focus-shield"
             type="button"
             :aria-label="t('workspace.livePreview.focusHint')"
@@ -92,7 +96,9 @@
           <Transition name="live-preview-focus-hint">
             <div
               v-if="
-                !agentStore.isSelectedProjectRunning && isPreviewFocusHintVisible
+                !agentStore.isSelectedProjectRunning &&
+                !isPreviewFullscreen &&
+                isPreviewFocusHintVisible
               "
               aria-live="polite"
               class="live-preview__focus-hint"

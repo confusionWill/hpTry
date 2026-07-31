@@ -52,7 +52,7 @@ const uiStore = useUiStore()
 const { importProjectFile } = useProjectImport()
 const { t } = useI18n()
 const providerDialogVisible = ref(false)
-const chatPanelCollapsed = ref(false)
+const chatPanelCollapsed = ref(true)
 const composerRef = ref<InstanceType<typeof AgentComposer> | null>(null)
 const isImportingProject = ref(false)
 
