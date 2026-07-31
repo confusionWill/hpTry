@@ -74,16 +74,10 @@
             tabindex="-1"
             :title="t('workspace.livePreview.title')"
           />
-          <button
-            v-if="
-              !agentStore.isSelectedProjectRunning &&
-              !isPreviewFocused &&
-              !isPreviewFullscreen
-            "
+          <span
+            v-if="!agentStore.isSelectedProjectRunning && !isPreviewFullscreen"
+            aria-hidden="true"
             class="live-preview__focus-shield"
-            type="button"
-            :aria-label="t('workspace.livePreview.focusHint')"
-            @click="focusPreviewFrame"
           />
           <div
             v-if="agentStore.isSelectedProjectRunning"
@@ -702,6 +696,8 @@ function clearPreviewFocusHint() {
 
 <style scoped>
 .live-preview {
+  position: relative;
+  z-index: 0;
   display: flex;
   min-width: 0;
   min-height: 0;
@@ -790,11 +786,12 @@ function clearPreviewFocusHint() {
 .live-preview__focus-shield {
   position: absolute;
   z-index: 1;
-  border: 0;
-  padding: 0;
   background: transparent;
-  cursor: default;
   inset: 0;
+}
+
+.live-preview__viewport:hover .live-preview__focus-shield {
+  display: none;
 }
 
 .live-preview__updating {
