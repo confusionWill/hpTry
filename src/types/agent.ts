@@ -44,7 +44,16 @@ export interface ConversationMessageEvent extends BaseConversationEvent {
   type: 'message'
   role: MessageRole
   content: string
+  uiContext?: AgentUiContext
   responseDurationMs?: number
+}
+
+export interface AgentUiContext {
+  selectedSlide: {
+    page: number
+    total: number
+    path: string
+  }
 }
 
 export interface Provider {

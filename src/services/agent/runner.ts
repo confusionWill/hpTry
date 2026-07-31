@@ -7,6 +7,7 @@ import {
 import type {
   Conversation,
   ConversationEvent,
+  ConversationMessageEvent,
   Project,
   Provider,
   ToolCall,
@@ -61,7 +62,7 @@ function toChatMessages(systemPrompt: string, events: ConversationEvent[]): Chat
     if (event.type === 'message') {
       messages.push({
         role: event.role,
-        content: event.content,
+        content: buildMessageContent(event),
       })
       eventIndex += 1
       continue
@@ -124,6 +125,20 @@ function toChatMessages(systemPrompt: string, events: ConversationEvent[]): Chat
   }
 
   return messages
+}
+
+function buildMessageContent(event: ConversationMessageEvent): string {
+  if (event.role !== 'user' || !event.uiContext) {
+    return event.content
+  }
+
+  return [
+    '<app_ui_context>',
+    JSON.stringify(event.uiContext),
+    '</app_ui_context>',
+    '',
+    event.content,
+  ].join('\n')
 }
 
 function buildToolResultContent(ok: boolean, output: string, error = ''): string {

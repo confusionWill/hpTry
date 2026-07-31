@@ -34,6 +34,7 @@ import {
 import { initializePresentationWorkspace } from '@/services/agent/presentationTemplate'
 import { exportWorkspaceAsHp, importWorkspaceFromHp } from '@/services/agent/workspaceExport'
 import type {
+  AgentUiContext,
   ChatMessage,
   Conversation,
   ConversationEvent,
@@ -864,6 +865,7 @@ export const useAgentStore = defineStore('agent', {
       emptyFinalMessage: string,
       titlePrompt: string,
       draftTitle: string,
+      uiContext?: AgentUiContext,
     ) {
       const runProject = this.selectedProject
       let runConversation = this.selectedConversation
@@ -1007,6 +1009,7 @@ export const useAgentStore = defineStore('agent', {
           type: 'message',
           role: 'user',
           content,
+          uiContext,
           createdAt: timestamp,
           updatedAt: timestamp,
         }

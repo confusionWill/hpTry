@@ -100,7 +100,9 @@ import {
   ChatCompletionResponseError,
 } from '@/services/openai'
 import { useAgentStore } from '@/stores/agent'
+import { usePresentationStore } from '@/stores/presentation'
 import { useUiStore } from '@/stores/ui'
+import type { AgentUiContext } from '@/types/agent'
 import { isTextFile, mimeTypeForPath } from '@/utils/fileType'
 import { formatBytes } from '@/utils/format'
 
@@ -113,6 +115,7 @@ interface UploadedAsset {
 const MAX_TEXT_UPLOAD_BYTES = 120_000
 
 const store = useAgentStore()
+const presentationStore = usePresentationStore()
 const uiStore = useUiStore()
 const { importProjectFile } = useProjectImport()
 const { n, t } = useI18n()
@@ -424,6 +427,8 @@ async function send() {
     return
   }
 
+  const uiContext = buildAgentUiContext()
+
   draft.value = ''
   uploadedAssets.value = uploadedAssets.value.filter(
     (asset) => asset.projectId !== store.selectedProjectId,
@@ -436,6 +441,7 @@ async function send() {
       t('agent.emptyFinalMessage'),
       CONVERSATION_TITLE_PROMPT,
       t('conversation.new'),
+      uiContext,
     )
   } catch (error) {
     if (error instanceof ChatCompletionRequestError) {
@@ -453,6 +459,24 @@ async function send() {
 
     const message = error instanceof Error ? error.message : t('provider.requestFailed')
     uiStore.showToast(message || t('provider.requestFailed'), 'error')
+  }
+}
+
+function buildAgentUiContext(): AgentUiContext | undefined {
+  const slides = presentationStore.manifest?.slides
+  const page = presentationStore.activeSlidePage
+  const path = slides?.[page - 1]
+
+  if (!slides?.length || !path) {
+    return undefined
+  }
+
+  return {
+    selectedSlide: {
+      page,
+      total: slides.length,
+      path,
+    },
   }
 }
 

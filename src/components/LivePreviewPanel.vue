@@ -198,6 +198,7 @@ onMounted(() => {
   window.addEventListener('message', handlePreviewMessage)
   window.addEventListener('blur', schedulePreviewFocusSync)
   window.addEventListener('focus', schedulePreviewFocusSync)
+  window.addEventListener('keydown', handlePreviewNavigationKeydown)
   document.addEventListener('focusin', schedulePreviewFocusSync)
   document.addEventListener('pointerdown', schedulePreviewFocusSync, true)
   document.addEventListener('fullscreenchange', syncFullscreenState)
@@ -215,6 +216,7 @@ onUnmounted(() => {
   window.removeEventListener('message', handlePreviewMessage)
   window.removeEventListener('blur', schedulePreviewFocusSync)
   window.removeEventListener('focus', schedulePreviewFocusSync)
+  window.removeEventListener('keydown', handlePreviewNavigationKeydown)
   document.removeEventListener('focusin', schedulePreviewFocusSync)
   document.removeEventListener('pointerdown', schedulePreviewFocusSync, true)
   previewResizeObserver?.disconnect()
@@ -302,6 +304,43 @@ function navigatePreviewFrameToSlide(page: number) {
       PREVIEW_ORIGIN,
     )
   }
+}
+
+function handlePreviewNavigationKeydown(event: KeyboardEvent) {
+  if (
+    event.defaultPrevented ||
+    event.isComposing ||
+    event.altKey ||
+    event.ctrlKey ||
+    event.metaKey ||
+    event.shiftKey ||
+    isPreviewFocused.value ||
+    agentStore.isSelectedProjectRunning ||
+    !presentationStore.previewUrl ||
+    isEditableKeyboardTarget(event.target)
+  ) {
+    return
+  }
+
+  const pageOffset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+
+  if (pageOffset === 0) {
+    return
+  }
+
+  event.preventDefault()
+  presentationStore.selectSlide(presentationStore.activeSlidePage + pageOffset)
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null): boolean {
+  return (
+    target instanceof Element &&
+    Boolean(
+      target.closest(
+        'input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"], [role="combobox"], [role="listbox"], [role="slider"], [role="spinbutton"]',
+      ),
+    )
+  )
 }
 
 function handlePreviewHostLoad() {
