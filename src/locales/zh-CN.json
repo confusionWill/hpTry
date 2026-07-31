@@ -81,7 +81,6 @@
       "selectFiles": "上传资源",
       "removeFile": "删除已上传文件 {name}",
       "removeFailed": "删除已上传文件失败",
-      "uploaded": "已上传 {count} 个资源到临时区。",
       "failed": "上传失败",
       "missingProject": "请先选择项目。",
       "messageHeading": "临时资源："

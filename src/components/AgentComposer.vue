@@ -102,6 +102,10 @@ import { useAgentStore } from '@/stores/agent'
 import { usePresentationStore } from '@/stores/presentation'
 import { useUiStore } from '@/stores/ui'
 import type { AgentUiContext } from '@/types/agent'
+import {
+  playAgentCompletionSound,
+  prepareAgentCompletionSound,
+} from '@/utils/agentCompletionSound'
 import { isTextFile, mimeTypeForPath } from '@/utils/fileType'
 import { formatBytes } from '@/utils/format'
 
@@ -350,9 +354,6 @@ async function uploadFiles(files: File[]) {
     }))
 
     uploadedAssets.value = [...uploadedAssets.value, ...uploaded]
-    if (store.selectedProjectId === projectId) {
-      uiStore.showToast(t('conversation.upload.uploaded', uploaded.length), 'success')
-    }
   } catch (error) {
     const message = error instanceof Error ? error.message : t('conversation.upload.failed')
     uiStore.showToast(message || t('conversation.upload.failed'), 'error')
@@ -427,6 +428,7 @@ async function send() {
   }
 
   const uiContext = buildAgentUiContext()
+  prepareAgentCompletionSound()
 
   draft.value = ''
   uploadedAssets.value = uploadedAssets.value.filter(
@@ -458,6 +460,8 @@ async function send() {
 
     const message = error instanceof Error ? error.message : t('provider.requestFailed')
     uiStore.showToast(message || t('provider.requestFailed'), 'error')
+  } finally {
+    void playAgentCompletionSound()
   }
 }
 

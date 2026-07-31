@@ -81,7 +81,6 @@
       "selectFiles": "Upload assets",
       "removeFile": "Delete uploaded file {name}",
       "removeFailed": "Failed to delete uploaded file",
-      "uploaded": "Uploaded {count} asset to .tmp. | Uploaded {count} assets to .tmp.",
       "failed": "Upload failed",
       "missingProject": "Select a project first.",
       "messageHeading": ".tmp assets:"
