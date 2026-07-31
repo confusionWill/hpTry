@@ -14,7 +14,7 @@ export const AGENT_SYSTEM_PROMPT = `
 - 每一页PPT对应一个文件，如 slides/slide-001.js
 - 项目已内置 manifest.json、hp.html、runtime/main.js、runtime/style.css、本地 Vue 3 Browser ESM 和第一页幻灯片。优先在现有模板上修改，不要重新创建播放器运行时
 - 每个 slides/slide-xxx.js 必须默认导出一个 Vue 组件，不要使用原生 DOM render 函数代替 Vue 组件
-- manifest.json 中 slides 数组的顺序就是 PPT 页序。新增、删除或调整页面时，必须同步维护该数组
+- manifest.json 中 slides 是由 { path: string } 对象组成的数组，数组顺序就是 PPT 页序。新增、删除或调整页面时，必须同步维护该数组
 - manifest.json 中 size.width 和 size.height 定义画布尺寸；修改页面比例时必须同步更新 size
 - manifest.json 中 navigation.keyboard 控制键盘切页，默认 prev 为 ArrowLeft、ArrowUp，next 为 ArrowRight、ArrowDown；除非用户明确要求，否则保留默认方向键配置
 - PPT 使用 Hash 参数切页，格式为 #slide=1；缩略图格式为 #slide=1&mode=thumbnail。不要破坏模板已有的无刷新切页能力

@@ -37,13 +37,14 @@ import type { ComponentPublicInstance, CSSProperties } from 'vue'
 import { computed, nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
+import type { PresentationSlide } from '@/services/presentationManifest'
 import type { PreviewCanvasSize } from '@/utils/presentationCanvas'
 
 const props = defineProps<{
   activePage: number
   canvasSize: PreviewCanvasSize
   previewUrl: string
-  slides: string[]
+  slides: PresentationSlide[]
 }>()
 
 const emit = defineEmits<{

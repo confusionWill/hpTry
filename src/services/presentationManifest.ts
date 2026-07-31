@@ -8,9 +8,13 @@ export const DEFAULT_PRESENTATION_SIZE: PresentationSize = {
   height: 1080,
 }
 
+export interface PresentationSlide {
+  path: string
+}
+
 export interface PresentationManifest {
   size: PresentationSize
-  slides: string[]
+  slides: PresentationSlide[]
 }
 
 export function parsePresentationManifest(content: string): PresentationManifest | null {
@@ -26,9 +30,7 @@ export function parsePresentationManifest(content: string): PresentationManifest
     if (
       !Array.isArray(manifest.slides) ||
       manifest.slides.length === 0 ||
-      !manifest.slides.every(
-        (slide): slide is string => typeof slide === 'string' && slide.length > 0,
-      )
+      !manifest.slides.every(isPresentationSlide)
     ) {
       return null
     }
@@ -37,11 +39,21 @@ export function parsePresentationManifest(content: string): PresentationManifest
       size: isPresentationSize(manifest.size)
         ? { ...manifest.size }
         : { ...DEFAULT_PRESENTATION_SIZE },
-      slides: [...manifest.slides],
+      slides: manifest.slides.map((slide) => ({ path: slide.path })),
     }
   } catch {
     return null
   }
+}
+
+function isPresentationSlide(value: unknown): value is PresentationSlide {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false
+  }
+
+  const slide = value as Partial<PresentationSlide>
+
+  return typeof slide.path === 'string' && slide.path.length > 0
 }
 
 function isPresentationSize(value: unknown): value is PresentationSize {

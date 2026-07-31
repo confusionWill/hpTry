@@ -17,6 +17,8 @@
     }
   },
   "slides": [
-    "./slides/slide-001.js"
+    {
+      "path": "./slides/slide-001.js"
+    }
   ]
 }

@@ -9,19 +9,29 @@ const manifest = await fetch(manifestUrl).then((response) => {
   return response.json()
 })
 
-if (!Array.isArray(manifest.slides) || manifest.slides.length === 0) {
-  throw new Error('manifest.json must contain at least one slide')
+if (
+  !Array.isArray(manifest.slides) ||
+  manifest.slides.length === 0 ||
+  !manifest.slides.every(
+    (slide) =>
+      slide &&
+      typeof slide === 'object' &&
+      typeof slide.path === 'string' &&
+      slide.path.length > 0,
+  )
+) {
+  throw new Error('manifest.json must contain at least one slide with a path')
 }
 
 document.title = manifest.name || 'Presentation'
 
-const slideComponents = manifest.slides.map((slidePath) =>
+const slideComponents = manifest.slides.map((slide) =>
   markRaw(
     defineAsyncComponent(async () => {
-      const slideModule = await import(new URL(slidePath, manifestUrl).href)
+      const slideModule = await import(new URL(slide.path, manifestUrl).href)
 
       if (!slideModule.default) {
-        throw new Error(`Slide ${slidePath} does not have a default export`)
+        throw new Error(`Slide ${slide.path} does not have a default export`)
       }
 
       return slideModule.default

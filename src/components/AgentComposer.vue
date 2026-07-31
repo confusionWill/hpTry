@@ -464,7 +464,7 @@ async function send() {
 function buildAgentUiContext(): AgentUiContext | undefined {
   const slides = presentationStore.manifest?.slides
   const page = presentationStore.activeSlidePage
-  const path = slides?.[page - 1]
+  const path = slides?.[page - 1]?.path
 
   if (!slides?.length || !path) {
     return undefined

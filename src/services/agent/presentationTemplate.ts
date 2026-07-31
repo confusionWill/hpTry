@@ -20,7 +20,9 @@ interface PresentationManifest {
       next: string[]
     }
   }
-  slides: string[]
+  slides: Array<{
+    path: string
+  }>
 }
 
 interface PresentationTemplateFile {
