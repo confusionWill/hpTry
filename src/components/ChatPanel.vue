@@ -774,7 +774,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
   flex: 0 0 auto;
   border-color: #374151;
   border-radius: 0;
-  background: #98c5fe;
+  background: #374151;
   color: var(--ui-color-white);
   padding: 0;
   view-transition-name: chat-panel-toggle;
@@ -782,7 +782,7 @@ function toolEventLabel(tool: ConversationToolEvent): string {
 
 .chat-panel__collapse:hover:not(:disabled) {
   border-color: #1f2937;
-  background: #98c5fe;
+  background: #1f2937;
   color: var(--ui-color-white);
 }
 
