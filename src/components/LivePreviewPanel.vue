@@ -725,7 +725,7 @@ function clearPreviewFocusHint() {
 .live-preview__viewport--focused::after {
   position: absolute;
   z-index: 2;
-  border: 3px solid var(--ui-color-primary);
+  border: 2px solid var(--ui-color-primary);
   content: '';
   inset: 0;
   pointer-events: none;

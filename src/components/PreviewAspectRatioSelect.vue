@@ -1,9 +1,5 @@
 <template>
   <div ref="rootRef" class="preview-aspect-ratio-select">
-    <span class="preview-aspect-ratio-select__label">
-      {{ t('workspace.livePreview.aspectRatio') }}
-    </span>
-
     <button
       type="button"
       class="preview-aspect-ratio-select__trigger"
@@ -155,12 +151,6 @@ function getRatioSwatchStyle(option: AspectRatioOption): Record<string, string> 
   align-items: center;
   gap: 8px;
   min-width: 0;
-}
-
-.preview-aspect-ratio-select__label {
-  color: var(--ui-text-color-secondary);
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 .preview-aspect-ratio-select__trigger {
