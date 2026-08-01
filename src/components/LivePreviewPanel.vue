@@ -66,34 +66,18 @@
             :key="presentationStore.previewUrl"
             allowfullscreen
             class="live-preview__frame"
-            :class="{
-              'live-preview__frame--updating': agentStore.isSelectedProjectRunning,
-            }"
-            :inert="agentStore.isSelectedProjectRunning"
             :src="presentationStore.mainPreviewUrl"
             tabindex="-1"
             :title="t('workspace.livePreview.title')"
           />
           <span
-            v-if="!agentStore.isSelectedProjectRunning && !isPreviewFullscreen"
+            v-if="!isPreviewFullscreen"
             aria-hidden="true"
             class="live-preview__focus-shield"
           />
-          <div
-            v-if="agentStore.isSelectedProjectRunning"
-            aria-live="polite"
-            class="live-preview__updating"
-            role="status"
-          >
-            {{ t('workspace.livePreview.updating') }}
-          </div>
           <Transition name="live-preview-focus-hint">
             <div
-              v-if="
-                !agentStore.isSelectedProjectRunning &&
-                !isPreviewFullscreen &&
-                isPreviewFocusHintVisible
-              "
+              v-if="!isPreviewFullscreen && isPreviewFocusHintVisible"
               aria-live="polite"
               class="live-preview__focus-hint"
               :class="{ 'live-preview__focus-hint--active': isPreviewFocused }"
@@ -236,26 +220,7 @@ watch(previewViewportRef, (viewport, previousViewport) => {
 
 watch(
   () => presentationStore.activeSlidePage,
-  (page) => {
-    if (!agentStore.isSelectedProjectRunning) {
-      navigatePreviewFrameToSlide(page)
-    }
-  },
-)
-watch(
-  () => agentStore.isSelectedProjectRunning,
-  (isRunning) => {
-    if (isRunning) {
-      if (document.activeElement === previewFrameRef.value) {
-        previewFrameRef.value?.blur()
-      }
-      isPreviewFocused.value = false
-      clearPreviewFocusHint()
-      isPreviewFocusHintVisible.value = false
-    } else {
-      schedulePreviewFocusSync()
-    }
-  },
+  (page) => navigatePreviewFrameToSlide(page),
 )
 watch(
   () => agentStore.selectedProjectId,
@@ -315,7 +280,6 @@ function handlePreviewNavigationKeydown(event: KeyboardEvent) {
     event.metaKey ||
     event.shiftKey ||
     isPreviewFocused.value ||
-    agentStore.isSelectedProjectRunning ||
     !presentationStore.previewUrl ||
     isEditableKeyboardTarget(event.target)
   ) {
@@ -454,8 +418,7 @@ async function respondToPreviewFileRequest(
   if (
     request.session !== previewSession ||
     request.projectId !== agentStore.selectedProjectId ||
-    request.version !== presentationStore.committedPreviewVersion ||
-    agentStore.isSelectedProjectRunning
+    request.version !== presentationStore.committedPreviewVersion
   ) {
     respondWithPreviewFile(request, responsePort, {
       protocol: PREVIEW_PROTOCOL_VERSION,
@@ -473,8 +436,7 @@ async function respondToPreviewFileRequest(
     if (
       request.session !== previewSession ||
       request.projectId !== agentStore.selectedProjectId ||
-      request.version !== presentationStore.committedPreviewVersion ||
-      agentStore.isSelectedProjectRunning
+      request.version !== presentationStore.committedPreviewVersion
     ) {
       respondWithPreviewFile(request, responsePort, {
         protocol: PREVIEW_PROTOCOL_VERSION,
@@ -653,9 +615,7 @@ function schedulePreviewFocusSync() {
   previewFocusSyncTimer = setTimeout(() => {
     previewFocusSyncTimer = null
     const nextFocused =
-      !agentStore.isSelectedProjectRunning &&
-      document.hasFocus() &&
-      document.activeElement === previewFrameRef.value
+      document.hasFocus() && document.activeElement === previewFrameRef.value
 
     if (nextFocused !== isPreviewFocused.value) {
       isPreviewFocused.value = nextFocused
@@ -779,10 +739,6 @@ function clearPreviewFocusHint() {
   background: #ffffff;
 }
 
-.live-preview__frame--updating {
-  pointer-events: none;
-}
-
 .live-preview__focus-shield {
   position: absolute;
   z-index: 1;
@@ -792,21 +748,6 @@ function clearPreviewFocusHint() {
 
 .live-preview__viewport:hover .live-preview__focus-shield {
   display: none;
-}
-
-.live-preview__updating {
-  position: absolute;
-  z-index: 1;
-  right: 12px;
-  bottom: 12px;
-  padding: 7px 10px;
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 8px;
-  background: rgb(17 19 24 / 82%);
-  color: #ffffff;
-  font-size: 12px;
-  line-height: 1.4;
-  pointer-events: none;
 }
 
 .live-preview__focus-hint {

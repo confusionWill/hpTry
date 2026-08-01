@@ -175,7 +175,6 @@
       "initializing": "正在准备实时预览",
       "focusHint": "点击页面聚焦",
       "keyboardReady": "键盘控制已启用",
-      "updating": "正在更新预览，完成后自动刷新",
       "unavailable": "当前浏览器不支持实时预览服务"
     },
     "previewDialog": {

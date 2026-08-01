@@ -175,7 +175,6 @@
       "initializing": "Preparing the live preview",
       "focusHint": "Click the page to focus",
       "keyboardReady": "Keyboard controls enabled",
-      "updating": "Updating the preview. It will refresh when complete.",
       "unavailable": "This browser does not support the live preview service"
     },
     "previewDialog": {
