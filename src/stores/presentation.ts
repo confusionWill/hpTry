@@ -43,13 +43,21 @@ export const usePresentationStore = defineStore('presentation', () => {
   })
 
   const indexFile = computed(() => {
-    const rootIndex = fileMap.value.get('hp.html')
+    const rootIndex = agentStore.workspaceFiles.find((file) => {
+      const normalizedPath = normalizePath(file.path)
+
+      return !normalizedPath.includes('/') && isPreviewEntryPath(normalizedPath)
+    })
 
     if (rootIndex) {
       return rootIndex
     }
 
-    return agentStore.workspaceFiles.find((file) => normalizePath(file.path).endsWith('/hp.html'))
+    return agentStore.workspaceFiles.find((file) => {
+      const normalizedPath = normalizePath(file.path)
+
+      return normalizedPath.includes('/') && isPreviewEntryPath(normalizedPath)
+    })
   })
 
   const manifestFile = computed(() => {
@@ -277,6 +285,10 @@ function normalizePath(path: string): string {
   }
 
   return parts.join('/')
+}
+
+function isPreviewEntryPath(path: string): boolean {
+  return path.split('/').pop()?.toLowerCase() === 'hp.html'
 }
 
 function findAspectRatioForSize(width: number, height: number): PreviewAspectRatio | undefined {

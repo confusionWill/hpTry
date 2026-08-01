@@ -224,7 +224,7 @@ function unavailableFileResponse(message, requestId = '') {
 }
 
 function isPreviewEntry(path) {
-  return path.split('/').pop() === 'hp.html'
+  return path.split('/').pop()?.toLowerCase() === 'hp.html'
 }
 
 function injectPreviewBridge(content) {
