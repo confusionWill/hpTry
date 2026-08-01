@@ -79,17 +79,65 @@ function isBinaryContent(bytes: Uint8Array): boolean {
   }
 }
 
+const SYSTEM_ARCHIVE_DIRECTORIES = new Set([
+  '__macosx',
+  '.documentrevisions-v100',
+  '.fseventsd',
+  '.spotlight-v100',
+  '.temporaryitems',
+  '.trashes',
+  '$recycle.bin',
+  'system volume information',
+])
+
+const SYSTEM_ARCHIVE_FILES = new Set([
+  '.ds_store',
+  '.volumeicon.icns',
+  'desktop.ini',
+  'thumbs.db',
+])
+
+function normalizeArchiveEntryPath(path: string): string {
+  return path.replace(/\\/g, '/').replace(/^\.\/+/, '')
+}
+
+function isSystemArchiveEntry(path: string): boolean {
+  const segments = normalizeArchiveEntryPath(path).split('/').filter(Boolean)
+  const fileName = segments.at(-1)?.toLowerCase() ?? ''
+
+  return (
+    segments.some((segment) => SYSTEM_ARCHIVE_DIRECTORIES.has(segment.toLowerCase())) ||
+    SYSTEM_ARCHIVE_FILES.has(fileName) ||
+    fileName.startsWith('._')
+  )
+}
+
+function sharedArchiveRoot(paths: string[]): string {
+  const firstPath = normalizeArchiveEntryPath(paths[0] ?? '')
+  const root = firstPath.split('/')[0] ?? ''
+  const prefix = root ? `${root}/` : ''
+
+  if (!prefix || !firstPath.startsWith(prefix)) {
+    return ''
+  }
+
+  return paths.every((path) => normalizeArchiveEntryPath(path).startsWith(prefix)) ? prefix : ''
+}
+
 export async function importWorkspaceFromHp(file: File): Promise<ImportedWorkspace> {
   const zip = await JSZip.loadAsync(file)
-  const archiveEntries = Object.values(zip.files).filter((entry) => !entry.dir)
+  const archiveEntries = Object.values(zip.files).filter(
+    (entry) => !entry.dir && !isSystemArchiveEntry(entry.name),
+  )
   if (archiveEntries.length === 0) {
     throw new Error('HP project contains no files')
   }
 
+  const archiveRoot = sharedArchiveRoot(archiveEntries.map((entry) => entry.name))
   const importedFiles: ImportedWorkspaceFile[] = []
 
   for (const entry of archiveEntries) {
-    const path = entry.name
+    const path = normalizeArchiveEntryPath(entry.name).slice(archiveRoot.length)
 
     const bytes = await entry.async('uint8array')
     const kind =
