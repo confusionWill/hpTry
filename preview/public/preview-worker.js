@@ -14,11 +14,20 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url)
 
-  if (url.origin !== self.location.origin || !url.pathname.startsWith(PREVIEW_PREFIX)) {
+  if (url.origin !== self.location.origin) {
     return
   }
 
-  event.respondWith(handlePreviewRequest(event.request, url))
+  if (url.pathname.startsWith(PREVIEW_PREFIX)) {
+    event.respondWith(handlePreviewRequest(event.request, url))
+    return
+  }
+
+  if (isPreviewInfrastructurePath(url.pathname)) {
+    return
+  }
+
+  event.respondWith(handleAbsolutePreviewRequest(event, url))
 })
 
 async function handlePreviewRequest(request, url) {
@@ -35,6 +44,37 @@ async function handlePreviewRequest(request, url) {
   }
 
   return fileResponse(response.resource, request, previewPath)
+}
+
+async function handleAbsolutePreviewRequest(event, url) {
+  const previewContext = await resolvePreviewContext(event)
+
+  if (!previewContext) {
+    return fetch(event.request)
+  }
+
+  const filePath = parseAbsoluteFilePath(url.pathname)
+
+  if (!filePath) {
+    return notFoundResponse()
+  }
+
+  const previewPath = {
+    ...previewContext,
+    filePath,
+  }
+
+  if (event.request.mode === 'navigate') {
+    return Response.redirect(createPreviewNavigationUrl(previewPath, url), 302)
+  }
+
+  const response = await requestPreviewResource(previewPath)
+
+  if (response.status !== 200) {
+    return errorResponse(response.status, response.message)
+  }
+
+  return fileResponse(response.resource, event.request, previewPath)
 }
 
 function parsePreviewPath(pathname) {
@@ -58,6 +98,91 @@ function parsePreviewPath(pathname) {
   } catch {
     return null
   }
+}
+
+async function resolvePreviewContext(event) {
+  if (event.clientId) {
+    const client = await self.clients.get(event.clientId)
+    const context = parsePreviewContextUrl(client?.url)
+
+    if (context) {
+      return context
+    }
+  }
+
+  return parsePreviewContextUrl(event.request.referrer)
+}
+
+function parsePreviewContextUrl(value) {
+  if (!value) {
+    return null
+  }
+
+  try {
+    const url = new URL(value)
+
+    if (url.origin !== self.location.origin) {
+      return null
+    }
+
+    const previewPath = parsePreviewPath(url.pathname)
+
+    if (!previewPath) {
+      return null
+    }
+
+    return {
+      session: previewPath.session,
+      projectId: previewPath.projectId,
+      version: previewPath.version,
+      parentOrigin: url.searchParams.get('__hpParentOrigin') ?? '',
+    }
+  } catch {
+    return null
+  }
+}
+
+function parseAbsoluteFilePath(pathname) {
+  try {
+    const path = pathname.split('/').map(decodeURIComponent).join('/')
+
+    return normalizePath(path) || 'hp.html'
+  } catch {
+    return null
+  }
+}
+
+function createPreviewNavigationUrl(previewPath, sourceUrl) {
+  const encodedPath = previewPath.filePath.split('/').map(encodeURIComponent).join('/')
+  const targetUrl = new URL(
+    [
+      PREVIEW_PREFIX.slice(0, -1),
+      encodeURIComponent(previewPath.session),
+      encodeURIComponent(previewPath.projectId),
+      encodeURIComponent(previewPath.version),
+      encodedPath,
+    ].join('/'),
+    self.location.origin,
+  )
+
+  targetUrl.search = sourceUrl.search
+  targetUrl.searchParams.set('v', previewPath.version)
+  targetUrl.searchParams.set('__hpSession', previewPath.session)
+  targetUrl.searchParams.set('__hpProjectId', previewPath.projectId)
+
+  if (previewPath.parentOrigin) {
+    targetUrl.searchParams.set('__hpParentOrigin', previewPath.parentOrigin)
+  }
+
+  return targetUrl.toString()
+}
+
+function isPreviewInfrastructurePath(pathname) {
+  return (
+    pathname === '/host.ts' ||
+    pathname === '/preview-bridge.js' ||
+    pathname === '/preview-worker.js'
+  )
 }
 
 async function requestPreviewResource(previewPath) {
