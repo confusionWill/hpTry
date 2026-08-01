@@ -82,8 +82,7 @@
       "removeFile": "删除已上传文件 {name}",
       "removeFailed": "删除已上传文件失败",
       "failed": "上传失败",
-      "missingProject": "请先选择项目。",
-      "messageHeading": "临时资源："
+      "missingProject": "请先选择项目。"
     },
     "toolGroup": "工具调用 {count} 次",
     "toolEventLabel": "{name}：{summary}，{status}",

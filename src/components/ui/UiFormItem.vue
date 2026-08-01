@@ -31,7 +31,7 @@ withDefaults(
 .ui-form-item__label {
   color: var(--ui-text-color-primary);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 400;
   line-height: 1.4;
 }
 

@@ -114,18 +114,18 @@
           :placeholder="t('provider.baseUrlPlaceholder')"
         />
       </UiFormItem>
-      <UiFormItem :label="t('provider.apiKey')" required>
-        <UiInput
-          v-model="form.apiKey"
-          :placeholder="t('provider.apiKeyPlaceholder')"
-          type="password"
-        />
-      </UiFormItem>
       <UiFormItem :label="t('provider.model')" required>
         <UiInput
           v-model="form.model"
           :disabled="isEditingDefaultProvider"
           :placeholder="t('provider.modelPlaceholder')"
+        />
+      </UiFormItem>
+      <UiFormItem :label="t('provider.apiKey')" required>
+        <UiInput
+          v-model="form.apiKey"
+          :placeholder="t('provider.apiKeyPlaceholder')"
+          type="password"
         />
       </UiFormItem>
     </form>

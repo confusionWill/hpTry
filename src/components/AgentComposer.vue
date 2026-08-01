@@ -407,10 +407,7 @@ function buildMessageContent(content: string): string {
   const assetLines = currentProjectAssets.value.map(
     (asset) => `- ${asset.path} (${formatBytes(asset.bytes, n)})`,
   )
-  const assetBlock = [
-    t('conversation.upload.messageHeading'),
-    ...assetLines,
-  ].join('\n')
+  const assetBlock = assetLines.join('\n')
 
   return content ? `${content}\n\n${assetBlock}` : assetBlock
 }

@@ -82,8 +82,7 @@
       "removeFile": "Delete uploaded file {name}",
       "removeFailed": "Failed to delete uploaded file",
       "failed": "Upload failed",
-      "missingProject": "Select a project first.",
-      "messageHeading": ".tmp assets:"
+      "missingProject": "Select a project first."
     },
     "toolGroup": "{count} tool call | {count} tool calls",
     "toolEventLabel": "{name}: {summary}, {status}",
