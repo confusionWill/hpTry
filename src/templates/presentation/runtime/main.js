@@ -23,8 +23,6 @@ if (
   throw new Error('manifest.json must contain at least one slide with a path')
 }
 
-document.title = manifest.name || 'Presentation'
-
 const slideComponents = manifest.slides.map((slide) =>
   markRaw(
     defineAsyncComponent(async () => {

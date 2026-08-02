@@ -9,7 +9,6 @@ import { upsertProjectWorkspaceFile } from '@/services/agent/workspaceFiles'
 import type { WorkspaceFile } from '@/types/agent'
 
 interface PresentationManifest {
-  name: string
   size: {
     width: number
     height: number
@@ -30,21 +29,24 @@ interface PresentationTemplateFile {
   content: string
 }
 
-function createManifest(projectName: string): string {
+function createManifest(): string {
   const manifest = JSON.parse(manifestTemplate) as PresentationManifest
-  manifest.name = projectName
 
   return `${JSON.stringify(manifest, null, 2)}\n`
 }
 
+function createFirstSlide(projectName: string): string {
+  return firstSlideTemplate.replace("'__PRESENTATION_TITLE__'", JSON.stringify(projectName))
+}
+
 function createTemplateFiles(projectName: string): PresentationTemplateFile[] {
   return [
-    { path: 'manifest.json', content: createManifest(projectName) },
+    { path: 'manifest.json', content: createManifest() },
     { path: 'hp.html', content: htmlTemplate },
     { path: 'runtime/main.js', content: presentationRuntimeTemplate },
     { path: 'runtime/style.css', content: presentationStyleTemplate },
     { path: 'runtime/vue.esm-browser.prod.js', content: vueBrowserRuntime },
-    { path: 'slides/slide-001.js', content: firstSlideTemplate },
+    { path: 'slides/slide-001.js', content: createFirstSlide(projectName) },
   ]
 }
 
