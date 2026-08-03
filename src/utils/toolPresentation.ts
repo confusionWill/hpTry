@@ -1,4 +1,5 @@
 import {
+  Bug,
   FilePenLine,
   FilePlus,
   FileText,
@@ -46,6 +47,23 @@ function getNumber(value: Record<string, unknown>, key: string): number | undefi
 }
 
 const toolPresentations: Record<AgentToolName, ToolPresentation> = {
+  get_preview_errors: {
+    icon: Bug,
+    summarize: ({ input, output, t }) => {
+      const errors = getNumber(output, 'count')
+      const mode = getString(input, 'mode') || 'current'
+
+      if (mode === 'refresh') {
+        return errors === undefined
+          ? t('conversation.toolSummary.refreshPreviewErrors')
+          : t('conversation.toolSummary.refreshPreviewErrorsWithCount', errors)
+      }
+
+      return errors === undefined
+        ? t('conversation.toolSummary.getPreviewErrors')
+        : t('conversation.toolSummary.getPreviewErrorsWithCount', errors)
+    },
+  },
   list_files: {
     icon: List,
     summarize: ({ output, t }) => {

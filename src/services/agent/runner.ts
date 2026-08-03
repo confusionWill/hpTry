@@ -14,6 +14,10 @@ import type {
   ToolRun,
   WorkspaceFile,
 } from '@/types/agent'
+import {
+  getPreviewErrorSnapshot,
+  validatePreviewErrors,
+} from '@/services/previewErrors'
 
 const MAX_AGENT_TOOL_ROUNDS = 50
 
@@ -185,6 +189,21 @@ async function executeToolCall(
       renameFile: handlers.renameFile,
       deleteDirectory: handlers.deleteDirectory,
       renameDirectory: handlers.renameDirectory,
+      getPreviewErrors: (mode) => {
+        if (mode === 'current') {
+          return Promise.resolve(getPreviewErrorSnapshot(runContext.project.id))
+        }
+
+        return validatePreviewErrors({
+          projectId: runContext.project.id,
+          version: runContext.files
+            .filter((file) => !file.path.replace(/^\.\/+/, '').startsWith('.tmp/'))
+            .map((file) => file.updatedAt)
+            .reduce((latest, updatedAt) => Math.max(latest, updatedAt), 0)
+            .toString(),
+          signal,
+        })
+      },
     })
 
     throwIfAborted(signal)

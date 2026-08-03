@@ -94,6 +94,10 @@
     },
     "toolSummary": {
       "generic": "执行工具",
+      "getPreviewErrors": "读取当前预览页报错",
+      "getPreviewErrorsWithCount": "读取当前预览页报错，{count} 条",
+      "refreshPreviewErrors": "刷新并检查预览页报错",
+      "refreshPreviewErrorsWithCount": "刷新并检查预览页报错，{count} 条",
       "listFiles": "列出文件",
       "listFilesWithCount": "列出 {count} 个文件",
       "searchFiles": "搜索文件",

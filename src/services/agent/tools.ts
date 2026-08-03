@@ -1,4 +1,5 @@
 import type { Project, ToolCall, WorkspaceFile } from '@/types/agent'
+import type { PreviewErrorSnapshot } from '@/services/previewErrors'
 
 export type AgentToolName =
   | 'list_files'
@@ -11,6 +12,7 @@ export type AgentToolName =
   | 'rename_file'
   | 'delete_directory'
   | 'rename_directory'
+  | 'get_preview_errors'
 
 export interface ChatTool {
   type: 'function'
@@ -37,6 +39,9 @@ export interface ToolExecutionContext {
   renameFile: (fromPath: string, toPath: string) => Promise<WorkspaceFile>
   deleteDirectory: (path: string) => Promise<number>
   renameDirectory: (fromPath: string, toPath: string) => Promise<WorkspaceFile[]>
+  getPreviewErrors: (
+    mode: 'current' | 'refresh',
+  ) => Promise<PreviewErrorSnapshot | undefined>
 }
 
 export interface ToolExecutionResult {
@@ -50,6 +55,26 @@ const DEFAULT_SEARCH_RESULTS = 50
 const MAX_SEARCH_RESULTS = 100
 
 export const hpTryTools: ChatTool[] = [
+  {
+    type: 'function',
+    function: {
+      name: 'get_preview_errors',
+      description:
+        'Get errors from the live preview. Use mode "current" to read errors already captured from the user\'s current preview without reloading or clearing them. Use mode "refresh" after editing files to reload the latest workspace snapshot, wait for it to render, and collect new errors.',
+      parameters: {
+        type: 'object',
+        properties: {
+          mode: {
+            type: 'string',
+            enum: ['current', 'refresh'],
+            description:
+              'Defaults to "current". Use "current" before diagnosing an existing user-visible error and "refresh" to validate edits.',
+          },
+        },
+        additionalProperties: false,
+      },
+    },
+  },
   {
     type: 'function',
     function: {
@@ -461,6 +486,39 @@ export async function executeBrowserAgentTool(
   }
 
   switch (toolName) {
+    case 'get_preview_errors': {
+      const modeValue = getOptionalString(input, 'mode') || 'current'
+
+      if (modeValue !== 'current' && modeValue !== 'refresh') {
+        throw new Error('mode must be either current or refresh')
+      }
+
+      const snapshot = await context.getPreviewErrors(modeValue)
+
+      if (!snapshot) {
+        return {
+          ok: true,
+          output: JSON.stringify({
+            available: false,
+            mode: modeValue,
+            count: 0,
+            errors: [],
+            message: 'The current live preview is not available yet.',
+          }),
+        }
+      }
+
+      return {
+        ok: true,
+        output: JSON.stringify({
+          available: true,
+          mode: modeValue,
+          version: snapshot.version,
+          count: snapshot.errors.length,
+          errors: snapshot.errors,
+        }),
+      }
+    }
     case 'list_files': {
       const files = context.listFiles().map((file) => ({
         path: file.path,

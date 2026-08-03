@@ -2,6 +2,7 @@ import {
   loadProjectWorkspaceFile,
   loadWorkspaceAsset,
 } from '@/services/agent/workspaceFiles'
+import type { PreviewRuntimeError } from '@/services/previewErrors'
 
 export const PREVIEW_PROTOCOL_VERSION = 2
 export const PREVIEW_ORIGIN = configuredPreviewOrigin()
@@ -56,7 +57,13 @@ export interface PreviewChannelMessage {
 
 export interface PreviewMessage {
   protocol: typeof PREVIEW_PROTOCOL_VERSION
-  type: 'preview:channel-request' | 'preview:error' | 'preview:ready' | 'preview:slide-change'
+  type:
+    | 'preview:channel-request'
+    | 'preview:error'
+    | 'preview:ready'
+    | 'preview:loaded'
+    | 'preview:slide-change'
+    | 'preview:runtime-error'
   session: string
   target?: 'document' | 'host'
   projectId?: string
@@ -64,6 +71,7 @@ export interface PreviewMessage {
   page?: number
   message?: string
   attempt?: number
+  error?: PreviewRuntimeError
 }
 
 export function createPreviewSession(): string {
@@ -168,7 +176,7 @@ export function isPreviewMessage(value: unknown): value is PreviewMessage {
     )
   }
 
-  if (message.type === 'preview:ready') {
+  if (message.type === 'preview:ready' || message.type === 'preview:loaded') {
     return (
       message.target === 'document' &&
       typeof message.projectId === 'string' &&
@@ -186,11 +194,44 @@ export function isPreviewMessage(value: unknown): value is PreviewMessage {
     )
   }
 
+  if (message.type === 'preview:runtime-error') {
+    return (
+      message.target === 'document' &&
+      typeof message.projectId === 'string' &&
+      typeof message.version === 'string' &&
+      isPreviewRuntimeError(message.error)
+    )
+  }
+
   if (message.type === 'preview:error') {
     return message.target === 'host' && typeof message.message === 'string'
   }
 
   return false
+}
+
+function isPreviewRuntimeError(value: unknown): value is PreviewRuntimeError {
+  if (typeof value !== 'object' || value === null) {
+    return false
+  }
+
+  const error = value as Partial<PreviewRuntimeError>
+
+  return (
+    (error.kind === 'runtime' ||
+      error.kind === 'unhandled-rejection' ||
+      error.kind === 'console' ||
+      error.kind === 'resource') &&
+    typeof error.message === 'string' &&
+    Boolean(error.message) &&
+    typeof error.timestamp === 'number' &&
+    Number.isFinite(error.timestamp) &&
+    (error.source === undefined || typeof error.source === 'string') &&
+    (error.line === undefined || (Number.isInteger(error.line) && Number(error.line) >= 0)) &&
+    (error.column === undefined ||
+      (Number.isInteger(error.column) && Number(error.column) >= 0)) &&
+    (error.stack === undefined || typeof error.stack === 'string')
+  )
 }
 
 export function isPreviewChannelMessage(value: unknown): value is PreviewChannelMessage {

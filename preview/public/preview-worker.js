@@ -359,10 +359,11 @@ function injectPreviewBridge(content) {
     return content
   }
 
-  const headEnd = content.search(/<\/head\s*>/i)
+  const headStart = /<head\b[^>]*>/i.exec(content)
 
-  if (headEnd >= 0) {
-    return `${content.slice(0, headEnd)}${PREVIEW_BRIDGE_TAG}\n${content.slice(headEnd)}`
+  if (headStart?.index !== undefined) {
+    const insertAt = headStart.index + headStart[0].length
+    return `${content.slice(0, insertAt)}\n${PREVIEW_BRIDGE_TAG}${content.slice(insertAt)}`
   }
 
   return `${PREVIEW_BRIDGE_TAG}\n${content}`

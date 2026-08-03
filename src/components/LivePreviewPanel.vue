@@ -63,7 +63,7 @@
         >
           <iframe
             ref="previewFrameRef"
-            :key="presentationStore.previewUrl"
+            :key="`${presentationStore.previewUrl}:${previewValidationAttempt}`"
             allowfullscreen
             class="live-preview__frame"
             :src="presentationStore.mainPreviewUrl"
@@ -121,6 +121,15 @@ import {
   type PreviewFileResponse,
   type PreviewMessage,
 } from '@/services/previewOrigin'
+import {
+  clearPreviewErrors,
+  getPreviewErrorSnapshot,
+  recordPreviewError,
+  registerPreviewErrorValidator,
+  resetPreviewErrors,
+  type PreviewErrorSnapshot,
+  type PreviewErrorValidationRequest,
+} from '@/services/previewErrors'
 import { useAgentStore } from '@/stores/agent'
 import { usePresentationStore } from '@/stores/presentation'
 
@@ -137,11 +146,23 @@ const previewViewportRef = ref<HTMLDivElement | null>(null)
 const isPreviewFullscreen = ref(false)
 const isPreviewFocused = ref(false)
 const isPreviewFocusHintVisible = ref(true)
+const previewValidationAttempt = ref(0)
 let previewResizeObserver: ResizeObserver | null = null
 let previewHostTimeout: ReturnType<typeof setTimeout> | null = null
 let previewHostPort: MessagePort | null = null
 let previewFocusSyncTimer: ReturnType<typeof setTimeout> | null = null
 let previewFocusHintTimer: ReturnType<typeof setTimeout> | null = null
+let unregisterPreviewErrorValidator: (() => void) | null = null
+let pendingPreviewValidation: {
+  projectId: string
+  version: string
+  resolve: (snapshot: PreviewErrorSnapshot | undefined) => void
+  reject: (error: Error) => void
+  timeout: ReturnType<typeof setTimeout>
+  settleTimer: ReturnType<typeof setTimeout> | null
+  signal?: AbortSignal
+  abortHandler?: () => void
+} | null = null
 
 const previewHostFrameUrl = computed(() =>
   createPreviewHostUrl(previewSession, previewHostAttempt.value),
@@ -179,6 +200,7 @@ const indexFile = computed(() => presentationStore.indexFile)
 
 onMounted(() => {
   presentationStore.beginPreviewSession(previewSession)
+  unregisterPreviewErrorValidator = registerPreviewErrorValidator(validateCurrentPreview)
   window.addEventListener('message', handlePreviewMessage)
   window.addEventListener('blur', schedulePreviewFocusSync)
   window.addEventListener('focus', schedulePreviewFocusSync)
@@ -192,11 +214,17 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  unregisterPreviewErrorValidator?.()
+  unregisterPreviewErrorValidator = null
+  cancelPendingPreviewValidation(new Error('Live preview was closed'))
   clearPreviewFocusSync()
   clearPreviewFocusHint()
   clearPreviewHostTimeout()
   closePreviewHostPort()
   presentationStore.endPreviewSession(previewSession)
+  if (agentStore.selectedProjectId) {
+    clearPreviewErrors(agentStore.selectedProjectId)
+  }
   window.removeEventListener('message', handlePreviewMessage)
   window.removeEventListener('blur', schedulePreviewFocusSync)
   window.removeEventListener('focus', schedulePreviewFocusSync)
@@ -224,7 +252,22 @@ watch(
 )
 watch(
   () => agentStore.selectedProjectId,
-  () => {
+  (projectId, previousProjectId) => {
+    if (
+      pendingPreviewValidation &&
+      pendingPreviewValidation.projectId !== projectId
+    ) {
+      cancelPendingPreviewValidation(new Error('Preview project changed'))
+    }
+
+    if (previousProjectId) {
+      clearPreviewErrors(previousProjectId)
+    }
+
+    if (projectId && !presentationStore.previewUrl) {
+      clearPreviewErrors(projectId)
+    }
+
     isPreviewFocused.value = false
     showPreviewFocusHint()
     schedulePreviewFocusSync()
@@ -232,9 +275,20 @@ watch(
 )
 watch(
   () => presentationStore.previewUrl,
-  () => {
+  (previewUrl) => {
     isPreviewFocused.value = false
     schedulePreviewFocusSync()
+
+    if (agentStore.selectedProjectId) {
+      if (previewUrl) {
+        resetPreviewErrors(
+          agentStore.selectedProjectId,
+          presentationStore.committedPreviewVersion,
+        )
+      } else {
+        clearPreviewErrors(agentStore.selectedProjectId)
+      }
+    }
   },
 )
 watch(
@@ -349,8 +403,124 @@ function handlePreviewMessage(event: MessageEvent) {
     return
   }
 
+  if (event.data.type === 'preview:loaded') {
+    settlePendingPreviewValidation(event.data.version as string)
+    return
+  }
+
+  if (event.data.type === 'preview:runtime-error' && event.data.error) {
+    recordPreviewError(event.data.projectId as string, event.data.version as string, event.data.error)
+    return
+  }
+
   if (event.data.type === 'preview:slide-change' && Number.isInteger(event.data.page)) {
     presentationStore.selectSlide(event.data.page as number)
+  }
+}
+
+function validateCurrentPreview(
+  request: PreviewErrorValidationRequest,
+): Promise<PreviewErrorSnapshot | undefined> {
+  if (request.signal?.aborted) {
+    return Promise.reject(new Error('Preview validation was canceled'))
+  }
+
+  if (
+    request.projectId !== agentStore.selectedProjectId ||
+    presentationStore.indexFile?.projectId !== request.projectId
+  ) {
+    return Promise.resolve(undefined)
+  }
+
+  cancelPendingPreviewValidation(new Error('Preview validation was superseded'))
+  resetPreviewErrors(request.projectId, request.version)
+
+  return new Promise((resolve, reject) => {
+    const abortHandler = () => {
+      cancelPendingPreviewValidation(new Error('Preview validation was canceled'))
+    }
+    const timeout = setTimeout(() => {
+      const pending = pendingPreviewValidation
+
+      if (
+        !pending ||
+        pending.projectId !== request.projectId ||
+        pending.version !== request.version
+      ) {
+        return
+      }
+
+      clearPendingPreviewValidation(pending)
+      reject(new Error('Preview validation timed out'))
+    }, 10_000)
+
+    pendingPreviewValidation = {
+      projectId: request.projectId,
+      version: request.version,
+      resolve,
+      reject,
+      timeout,
+      settleTimer: null,
+      signal: request.signal,
+      abortHandler,
+    }
+    request.signal?.addEventListener('abort', abortHandler, { once: true })
+
+    if (
+      !presentationStore.commitPreviewVersionForValidation(
+        request.projectId,
+        request.version,
+      )
+    ) {
+      clearPendingPreviewValidation(pendingPreviewValidation)
+      resolve(undefined)
+      return
+    }
+
+    if (previewHostReady.value) {
+      markPreviewSourceReady()
+    }
+
+    previewValidationAttempt.value += 1
+  })
+}
+
+function settlePendingPreviewValidation(version: string) {
+  const pending = pendingPreviewValidation
+
+  if (!pending || pending.version !== version || pending.settleTimer) {
+    return
+  }
+
+  pending.settleTimer = setTimeout(() => {
+    clearPendingPreviewValidation(pending)
+    pending.resolve(getPreviewErrorSnapshot(pending.projectId))
+  }, 800)
+}
+
+function cancelPendingPreviewValidation(error: Error) {
+  const pending = pendingPreviewValidation
+
+  if (!pending) {
+    return
+  }
+
+  clearPendingPreviewValidation(pending)
+  pending.reject(error)
+}
+
+function clearPendingPreviewValidation(
+  pending: NonNullable<typeof pendingPreviewValidation>,
+) {
+  clearTimeout(pending.timeout)
+  if (pending.settleTimer) {
+    clearTimeout(pending.settleTimer)
+  }
+  if (pending.abortHandler) {
+    pending.signal?.removeEventListener('abort', pending.abortHandler)
+  }
+  if (pendingPreviewValidation === pending) {
+    pendingPreviewValidation = null
   }
 }
 

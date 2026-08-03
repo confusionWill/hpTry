@@ -94,6 +94,10 @@
     },
     "toolSummary": {
       "generic": "Run tool",
+      "getPreviewErrors": "Read current preview errors",
+      "getPreviewErrorsWithCount": "Read current preview errors, {count} error | Read current preview errors, {count} errors",
+      "refreshPreviewErrors": "Refresh and check preview errors",
+      "refreshPreviewErrorsWithCount": "Refresh and check preview errors, {count} error | Refresh and check preview errors, {count} errors",
       "listFiles": "List files",
       "listFilesWithCount": "List {count} file | List {count} files",
       "searchFiles": "Search files",

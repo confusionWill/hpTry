@@ -243,6 +243,19 @@ export const usePresentationStore = defineStore('presentation', () => {
     clearMirroredPreview()
   }
 
+  function commitPreviewVersionForValidation(projectId: string, version: string): boolean {
+    if (
+      !version ||
+      projectId !== agentStore.selectedProjectId ||
+      indexFile.value?.projectId !== projectId
+    ) {
+      return false
+    }
+
+    committedPreviewVersion.value = version
+    return true
+  }
+
   function markPreviewSourceReady(
     session: string,
     projectId: string,
@@ -273,6 +286,7 @@ export const usePresentationStore = defineStore('presentation', () => {
   return {
     activeSlidePage,
     beginPreviewSession,
+    commitPreviewVersionForValidation,
     committedPreviewVersion,
     endPreviewSession,
     indexFile,
