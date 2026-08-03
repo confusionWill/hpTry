@@ -23,17 +23,26 @@ if (
   throw new Error('manifest.json must contain at least one slide with a path')
 }
 
-const slideComponents = await Promise.all(
-  manifest.slides.map(async (slide) => {
-    const slideModule = await import(new URL(slide.path, manifestUrl).href)
+const initialHashParams = new URLSearchParams(location.hash.slice(1))
+const initialThumbnail = initialHashParams.get('mode') === 'thumbnail'
+syncDocumentMode(initialThumbnail)
+const initialState = readHashState()
 
-    if (!slideModule.default) {
-      throw new Error(`Slide ${slide.path} does not have a default export`)
-    }
+async function loadSlideComponent(slide) {
+  const slideModule = await import(new URL(slide.path, manifestUrl).href)
 
-    return markRaw(slideModule.default)
-  }),
-)
+  if (!slideModule.default) {
+    throw new Error(`Slide ${slide.path} does not have a default export`)
+  }
+
+  return slideModule.default
+}
+
+const slideComponents = initialThumbnail
+  ? [markRaw(await loadSlideComponent(manifest.slides[initialState.page - 1]))]
+  : (await Promise.all(manifest.slides.map(loadSlideComponent))).map((component) =>
+      markRaw(component),
+    )
 
 const keyboardNavigation = {
   prev: Array.isArray(manifest.navigation?.keyboard?.prev)
@@ -48,7 +57,7 @@ function readHashState() {
   const params = new URLSearchParams(location.hash.slice(1))
   const requestedPage = Number.parseInt(params.get('slide') || '1', 10)
   const page = Number.isInteger(requestedPage)
-    ? Math.min(Math.max(requestedPage, 1), slideComponents.length)
+    ? Math.min(Math.max(requestedPage, 1), manifest.slides.length)
     : 1
 
   return {
@@ -57,9 +66,13 @@ function readHashState() {
   }
 }
 
+function syncDocumentMode(thumbnail) {
+  document.documentElement.dataset.mode = thumbnail ? 'thumbnail' : 'preview'
+}
+
 function goToPage(page) {
   const state = readHashState()
-  const nextPage = Math.min(Math.max(page, 1), slideComponents.length)
+  const nextPage = Math.min(Math.max(page, 1), manifest.slides.length)
 
   if (nextPage === state.page) {
     return
@@ -70,14 +83,18 @@ function goToPage(page) {
   location.hash = params.toString()
 }
 
+syncDocumentMode(initialState.thumbnail)
+
 const PresentationApp = {
   setup() {
-    const state = ref(readHashState())
-    const currentSlide = computed(() => slideComponents[state.value.page - 1])
+    const state = ref(initialState)
+    const currentSlide = computed(() =>
+      initialThumbnail ? slideComponents[0] : slideComponents[state.value.page - 1],
+    )
 
     function syncFromHash() {
       state.value = readHashState()
-      document.documentElement.dataset.mode = state.value.thumbnail ? 'thumbnail' : 'preview'
+      syncDocumentMode(state.value.thumbnail)
     }
 
     function handleKeydown(event) {
