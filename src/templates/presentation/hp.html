@@ -3,11 +3,14 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Presentation</title>
-    <link rel="stylesheet" href="./runtime/style.css" />
+    <title></title>
+    <link rel="stylesheet" href="./styles/runtime.css" />
+    <link rel="stylesheet" href="./styles/slides.css" />
   </head>
   <body>
-    <main id="presentation" aria-live="polite"></main>
-    <script type="module" src="./runtime/main.js"></script>
+    <div id="app">
+      <component :is="currentSlide"></component>
+    </div>
+    <script type="module" src="./main.js"></script>
   </body>
 </html>

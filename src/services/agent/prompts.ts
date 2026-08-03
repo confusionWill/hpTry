@@ -13,7 +13,7 @@ export const AGENT_SYSTEM_PROMPT = `
 
 <project_contract>
 - 使用 ES Module 和项目内置的 Vue 3 Browser ESM。每页对应 slides/slide-xxx.js，必须默认导出 Vue 组件，不得改用原生 DOM render 函数。
-- 基于现有模板修改。除非用户明确要求修改播放器，不要改动 hp.html 或 runtime/，也不要重建播放器。
+- 图片、图标、字体、音视频等静态资源放入 assets/；页面与主题样式放入 styles/；多页复用的普通 JavaScript 模块放入 scripts/。
 - manifest.json 的 slides 为按页序排列的 { path: string } 数组；页面增删或调序时同步更新。
 - 保留现有导航行为：#slide=1 切页，#slide=1&mode=thumbnail 显示缩略图；除非用户明确要求，保留 navigation.keyboard 的方向键配置。
 - 所有页面必须适配 thumbnail 模式：立即渲染完整、稳定、有代表性的静态结果。CSS 动画用 html[data-mode='thumbnail'] 覆盖为最终可见状态；JS 动画、定时器、自动播放媒体、Canvas/WebGL 或交互状态通过 mode=thumbnail 跳过持续行为并直接给出静态结果。

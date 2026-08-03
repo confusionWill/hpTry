@@ -2,12 +2,6 @@ const presentationTitle = '__PRESENTATION_TITLE__'
 
 export default {
   name: 'Slide001',
-  props: {
-    manifest: {
-      type: Object,
-      required: true,
-    },
-  },
   setup() {
     return {
       presentationTitle,

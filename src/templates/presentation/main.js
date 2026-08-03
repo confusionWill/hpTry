@@ -1,6 +1,6 @@
-import { computed, createApp, defineAsyncComponent, markRaw, onBeforeUnmount, onMounted, ref } from './vue.esm-browser.prod.js'
+import { computed, createApp, markRaw, onBeforeUnmount, onMounted, ref } from './runtime/vue.esm-browser.prod.js'
 
-const manifestUrl = new URL('../manifest.json', import.meta.url)
+const manifestUrl = new URL('./manifest.json', import.meta.url)
 const manifest = await fetch(manifestUrl).then((response) => {
   if (!response.ok) {
     throw new Error(`Unable to load manifest.json (${response.status})`)
@@ -23,18 +23,16 @@ if (
   throw new Error('manifest.json must contain at least one slide with a path')
 }
 
-const slideComponents = manifest.slides.map((slide) =>
-  markRaw(
-    defineAsyncComponent(async () => {
-      const slideModule = await import(new URL(slide.path, manifestUrl).href)
+const slideComponents = await Promise.all(
+  manifest.slides.map(async (slide) => {
+    const slideModule = await import(new URL(slide.path, manifestUrl).href)
 
-      if (!slideModule.default) {
-        throw new Error(`Slide ${slide.path} does not have a default export`)
-      }
+    if (!slideModule.default) {
+      throw new Error(`Slide ${slide.path} does not have a default export`)
+    }
 
-      return slideModule.default
-    }),
-  ),
+    return markRaw(slideModule.default)
+  }),
 )
 
 const keyboardNavigation = {
@@ -109,17 +107,8 @@ const PresentationApp = {
 
     return {
       currentSlide,
-      manifest,
-      state,
     }
   },
-  template: `
-    <component
-      :is="currentSlide"
-      :manifest="manifest"
-      :page="state.page"
-    />
-  `,
 }
 
-createApp(PresentationApp).mount('#presentation')
+createApp(PresentationApp).mount('#app')
