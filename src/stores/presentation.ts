@@ -17,7 +17,7 @@ import {
 export const usePresentationStore = defineStore('presentation', () => {
   const agentStore = useAgentStore()
   const activeSlidePage = ref(1)
-  const committedPreviewVersion = ref('0')
+  const committedPreviewVersion = ref('')
   const previewSession = ref('')
   const mirroredProjectId = ref('')
   const mirroredPreviewVersion = ref('')
@@ -123,13 +123,31 @@ export const usePresentationStore = defineStore('presentation', () => {
   )
 
   watch(
-    [latestWorkspaceVersion, () => agentStore.isSelectedProjectRunning],
-    ([latestVersion, isRunning], [, wasRunning]) => {
-      if (isRunning) {
+    [
+      () => agentStore.selectedProjectId,
+      () => indexFile.value?.id ?? '',
+      latestWorkspaceVersion,
+      () => agentStore.isSelectedProjectRunning,
+    ],
+    ([projectId, indexFileId, latestVersion, isRunning], [previousProjectId, , , wasRunning]) => {
+      if (projectId !== previousProjectId) {
+        committedPreviewVersion.value = ''
+      }
+
+      if (
+        isRunning ||
+        !projectId ||
+        !indexFileId ||
+        indexFile.value?.projectId !== projectId
+      ) {
         return
       }
 
-      if (wasRunning || committedPreviewVersion.value !== latestVersion) {
+      if (
+        projectId !== previousProjectId ||
+        wasRunning ||
+        committedPreviewVersion.value !== latestVersion
+      ) {
         committedPreviewVersion.value = latestVersion
       }
     },
