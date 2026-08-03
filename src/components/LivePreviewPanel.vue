@@ -286,7 +286,12 @@ function handlePreviewNavigationKeydown(event: KeyboardEvent) {
     return
   }
 
-  const pageOffset = event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
+  const pageOffset =
+    event.key === 'ArrowUp' || event.key === 'ArrowLeft'
+      ? -1
+      : event.key === 'ArrowDown' || event.key === 'ArrowRight'
+        ? 1
+        : 0
 
   if (pageOffset === 0) {
     return
