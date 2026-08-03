@@ -1,7 +1,7 @@
 import manifestTemplate from '@/templates/presentation/manifest.json?raw'
 import presentationMainTemplate from '@/templates/presentation/main.js?raw'
-import presentationRuntimeStyleTemplate from '@/templates/presentation/styles/runtime.css?raw'
-import presentationSlidesStyleTemplate from '@/templates/presentation/styles/slides.css?raw'
+import presentationRuntimeStyleTemplate from '@/templates/presentation/runtime/runtime.css?raw'
+import presentationStyleTemplate from '@/templates/presentation/styles/style.css?raw'
 import htmlTemplate from '@/templates/presentation/hp.html?raw'
 import firstSlideTemplate from '@/templates/presentation/slides/slide-001.js?raw'
 import vueBrowserRuntime from 'vue/dist/vue.esm-browser.prod.js?raw'
@@ -45,12 +45,10 @@ function createTemplateFiles(projectName: string): PresentationTemplateFile[] {
     { path: 'manifest.json', content: createManifest() },
     { path: 'hp.html', content: htmlTemplate },
     { path: 'main.js', content: presentationMainTemplate },
-    { path: 'assets/.gitkeep', content: '' },
     { path: 'runtime/vue.esm-browser.prod.js', content: vueBrowserRuntime },
-    { path: 'scripts/.gitkeep', content: '' },
     { path: 'slides/slide-001.js', content: createFirstSlide(projectName) },
-    { path: 'styles/runtime.css', content: presentationRuntimeStyleTemplate },
-    { path: 'styles/slides.css', content: presentationSlidesStyleTemplate },
+    { path: 'runtime/runtime.css', content: presentationRuntimeStyleTemplate },
+    { path: 'styles/style.css', content: presentationStyleTemplate },
   ]
 }
 
