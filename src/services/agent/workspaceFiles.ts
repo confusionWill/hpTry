@@ -35,6 +35,50 @@ export async function clearTemporaryWorkspaceFiles(): Promise<void> {
   }
 }
 
+const DEMO_PREVIEW_PROJECT_PREFIX = 'demo-preview_'
+
+export function createDemoPreviewProjectId(): string {
+  return createId('demo-preview')
+}
+
+export async function clearDemoPreviewWorkspaces(
+  activeProjectId = '',
+): Promise<void> {
+  const [files, assets] = await Promise.all([
+    getAllRecords('workspaceFiles'),
+    getAllRecords('workspaceAssets'),
+  ])
+  const isStaleDemoProject = (projectId: string) =>
+    projectId.startsWith(DEMO_PREVIEW_PROJECT_PREFIX) && projectId !== activeProjectId
+
+  for (const asset of assets.filter((item) => isStaleDemoProject(item.projectId))) {
+    await deleteRecord('workspaceAssets', asset.id)
+  }
+
+  for (const file of files.filter((item) => isStaleDemoProject(item.projectId))) {
+    await deleteRecord('workspaceFiles', file.id)
+  }
+}
+
+export async function deleteDemoPreviewWorkspace(projectId: string): Promise<void> {
+  if (!projectId.startsWith(DEMO_PREVIEW_PROJECT_PREFIX)) {
+    return
+  }
+
+  const [files, assets] = await Promise.all([
+    getRecordsByIndex('workspaceFiles', 'projectId', projectId),
+    getRecordsByIndex('workspaceAssets', 'projectId', projectId),
+  ])
+
+  for (const asset of assets) {
+    await deleteRecord('workspaceAssets', asset.id)
+  }
+
+  for (const file of files) {
+    await deleteRecord('workspaceFiles', file.id)
+  }
+}
+
 export async function upsertProjectWorkspaceFile(
   projectId: string,
   files: WorkspaceFile[],

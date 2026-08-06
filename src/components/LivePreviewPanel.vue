@@ -11,9 +11,10 @@
       @load="handlePreviewHostLoad"
     />
 
-    <header class="live-preview__header">
+    <header v-if="!props.readonly" class="live-preview__header">
       <div class="live-preview__actions">
         <PreviewAspectRatioSelect
+          v-if="!props.readonly"
           v-model="presentationStore.selectedAspectRatio"
           :canvas-size="presentationStore.selectedCanvasSize"
         />
@@ -32,9 +33,27 @@
             <Maximize2 v-else :size="16" />
           </template>
         </UiButton>
-        <WorkspaceExportButton />
+        <WorkspaceExportButton v-if="!props.readonly" />
       </div>
     </header>
+
+    <Teleport v-else-if="props.fullscreenControlTarget" :to="props.fullscreenControlTarget">
+      <UiButton
+        :aria-label="
+          isPreviewFullscreen
+            ? t('workspace.livePreview.exitFullscreen')
+            : t('workspace.livePreview.enterFullscreen')
+        "
+        :disabled="!canUseFullscreen"
+        circle
+        @click="togglePreviewFullscreen"
+      >
+        <template #icon>
+          <Minimize2 v-if="isPreviewFullscreen" :size="16" />
+          <Maximize2 v-else :size="16" />
+        </template>
+      </UiButton>
+    </Teleport>
 
     <div class="live-preview__body">
       <UiEmpty
@@ -132,6 +151,17 @@ import {
 } from '@/services/previewErrors'
 import { useAgentStore } from '@/stores/agent'
 import { usePresentationStore } from '@/stores/presentation'
+
+const props = withDefaults(
+  defineProps<{
+    readonly?: boolean
+    fullscreenControlTarget?: string
+  }>(),
+  {
+    readonly: false,
+    fullscreenControlTarget: '',
+  },
+)
 
 const agentStore = useAgentStore()
 const presentationStore = usePresentationStore()

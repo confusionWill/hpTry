@@ -55,6 +55,19 @@
     "deleteConfirm": "确认删除项目“{name}”？项目中的会话和所有相关文件也会一并删除。",
     "deleteFailed": "删除项目失败"
   },
+  "demo": {
+    "title": "演示案例",
+    "badge": "演示",
+    "back": "返回工作区",
+    "loading": "正在加载演示案例",
+    "loadFailed": "案例不存在或暂时无法加载",
+    "retry": "重新加载",
+    "builtIn": {
+      "welcome": {
+        "name": "hpTry 演示案例"
+      }
+    }
+  },
   "conversation": {
     "title": "会话",
     "new": "新建会话",

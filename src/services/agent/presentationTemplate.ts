@@ -25,7 +25,7 @@ interface PresentationManifest {
   }>
 }
 
-interface PresentationTemplateFile {
+export interface PresentationTemplateFile {
   path: string
   content: string
 }
@@ -40,7 +40,9 @@ function createFirstSlide(projectName: string): string {
   return firstSlideTemplate.replace("'__PRESENTATION_TITLE__'", JSON.stringify(projectName))
 }
 
-function createTemplateFiles(projectName: string): PresentationTemplateFile[] {
+export function createPresentationTemplateFiles(
+  projectName: string,
+): PresentationTemplateFile[] {
   return [
     { path: 'manifest.json', content: createManifest() },
     { path: 'hp.html', content: htmlTemplate },
@@ -58,7 +60,7 @@ export async function initializePresentationWorkspace(
 ): Promise<WorkspaceFile[]> {
   const files: WorkspaceFile[] = []
 
-  for (const templateFile of createTemplateFiles(projectName)) {
+  for (const templateFile of createPresentationTemplateFiles(projectName)) {
     await upsertProjectWorkspaceFile(
       projectId,
       files,

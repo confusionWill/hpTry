@@ -55,6 +55,19 @@
     "deleteConfirm": "Delete “{name}”? Its conversations and all related files will also be deleted.",
     "deleteFailed": "Failed to delete project"
   },
+  "demo": {
+    "title": "Demo case",
+    "badge": "Demo",
+    "back": "Back to workspace",
+    "loading": "Loading demo case",
+    "loadFailed": "This demo case does not exist or cannot be loaded",
+    "retry": "Reload",
+    "builtIn": {
+      "welcome": {
+        "name": "hpTry demo case"
+      }
+    }
+  },
   "conversation": {
     "title": "Conversations",
     "new": "New conversation",

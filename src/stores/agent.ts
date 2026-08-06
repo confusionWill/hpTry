@@ -22,7 +22,10 @@ import {
   putRecord,
 } from '@/services/db'
 import {
+  clearDemoPreviewWorkspaces,
   clearTemporaryWorkspaceFiles,
+  createDemoPreviewProjectId,
+  deleteDemoPreviewWorkspace,
   deleteProjectWorkspaceFile,
   deleteProjectWorkspaceDirectory,
   loadProjectWorkspaceFiles,
@@ -33,6 +36,7 @@ import {
 } from '@/services/agent/workspaceFiles'
 import { initializePresentationWorkspace } from '@/services/agent/presentationTemplate'
 import { exportWorkspaceAsHp, importWorkspaceFromHp } from '@/services/agent/workspaceExport'
+import { loadDemoCase } from '@/services/demoCases'
 import type {
   AgentUiContext,
   ChatMessage,
@@ -57,6 +61,12 @@ const activeRunControllers = new Map<string, AbortController>()
 interface ActiveAgentRun {
   projectId: string
   conversationId: string
+}
+
+interface DemoPreviewSession {
+  caseId: string
+  project: Project
+  returnProjectId: string
 }
 
 interface ConversationTurnPage {
@@ -186,6 +196,7 @@ export const useAgentStore = defineStore('agent', {
     events: [] as ConversationEvent[],
     providers: [] as Provider[],
     workspaceFiles: [] as WorkspaceFile[],
+    activeDemoPreview: null as DemoPreviewSession | null,
     selectedProjectId: '',
     selectedConversationId: '',
     selectedProviderId: '',
@@ -199,9 +210,14 @@ export const useAgentStore = defineStore('agent', {
     conversationLoadToken: 0,
     loadingOlderTurns: false,
     hasOlderTurns: false,
+    demoLoadToken: 0,
   }),
   getters: {
     selectedProject(state): Project | undefined {
+      if (state.activeDemoPreview?.project.id === state.selectedProjectId) {
+        return state.activeDemoPreview.project
+      }
+
       return state.projects.find((project) => project.id === state.selectedProjectId)
     },
     selectedConversation(state): Conversation | undefined {
@@ -257,6 +273,7 @@ export const useAgentStore = defineStore('agent', {
       this.loading = true
       try {
         await clearTemporaryWorkspaceFiles()
+        await clearDemoPreviewWorkspaces(this.activeDemoPreview?.project.id)
         this.projects = sortUpdated(await getAllRecords('projects'))
         const storedProviders = await getAllRecords('providers')
         const defaultProvider = storedProviders.find(isDefaultProvider)
@@ -286,6 +303,118 @@ export const useAgentStore = defineStore('agent', {
         }
       } finally {
         this.loading = false
+      }
+    },
+    async openDemoPreview(caseId: string, builtInDemoName: string): Promise<boolean> {
+      const loadToken = this.demoLoadToken + 1
+      this.demoLoadToken = loadToken
+      const imported = await loadDemoCase(caseId, builtInDemoName)
+
+      if (this.demoLoadToken !== loadToken) {
+        return false
+      }
+
+      const currentDemo = this.activeDemoPreview
+      const returnProjectId =
+        currentDemo?.returnProjectId ||
+        (this.projects.some((project) => project.id === this.selectedProjectId)
+          ? this.selectedProjectId
+          : loadSelectedProjectId())
+
+      if (currentDemo) {
+        await deleteDemoPreviewWorkspace(currentDemo.project.id)
+      }
+
+      const timestamp = now()
+      const project: Project = {
+        id: createDemoPreviewProjectId(),
+        name: imported.name,
+        description: '',
+        createdAt: timestamp,
+        updatedAt: timestamp,
+      }
+      const workspaceFiles: WorkspaceFile[] = []
+
+      try {
+        for (const importedFile of imported.files) {
+          if (importedFile.kind === 'asset' && importedFile.blob) {
+            await upsertProjectWorkspaceAsset(
+              project.id,
+              workspaceFiles,
+              importedFile.path,
+              importedFile.blob,
+              importedFile.name ?? importedFile.path.split('/').pop() ?? importedFile.path,
+              importedFile.mimeType ?? 'application/octet-stream',
+            )
+            continue
+          }
+
+          await upsertProjectWorkspaceFile(
+            project.id,
+            workspaceFiles,
+            importedFile.path,
+            importedFile.content ?? '',
+          )
+        }
+      } catch (error) {
+        await deleteDemoPreviewWorkspace(project.id)
+        throw error
+      }
+
+      if (this.demoLoadToken !== loadToken) {
+        await deleteDemoPreviewWorkspace(project.id)
+        return false
+      }
+
+      this.activeDemoPreview = {
+        caseId,
+        project,
+        returnProjectId,
+      }
+      this.projectLoadToken += 1
+      this.conversationLoadToken += 1
+      this.selectedProjectId = project.id
+      this.conversations = []
+      this.turns = []
+      this.events = []
+      this.workspaceFiles = workspaceFiles
+      this.selectedConversationId = ''
+      this.selectedWorkspaceFilePath = workspaceFiles[0]?.path ?? ''
+      this.draftConversationProjectId = ''
+      this.hasOlderTurns = false
+      this.loadingOlderTurns = false
+
+      return true
+    },
+    async closeDemoPreview(): Promise<void> {
+      this.demoLoadToken += 1
+      const demo = this.activeDemoPreview
+
+      if (!demo) {
+        return
+      }
+
+      this.activeDemoPreview = null
+      this.projectLoadToken += 1
+      this.conversationLoadToken += 1
+      this.selectedProjectId = ''
+      this.conversations = []
+      this.turns = []
+      this.events = []
+      this.workspaceFiles = []
+      this.selectedConversationId = ''
+      this.selectedWorkspaceFilePath = ''
+      this.draftConversationProjectId = ''
+      this.hasOlderTurns = false
+      this.loadingOlderTurns = false
+
+      await deleteDemoPreviewWorkspace(demo.project.id)
+
+      const returnProject =
+        this.projects.find((project) => project.id === demo.returnProjectId) ?? this.projects[0]
+
+      if (returnProject) {
+        await this.selectProject(returnProject.id)
       }
     },
     async selectProject(projectId: string, startNewConversation = false) {
