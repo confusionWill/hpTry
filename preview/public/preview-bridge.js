@@ -7,6 +7,10 @@
   const parentOrigin = parseOrigin(searchParams.get('__hpParentOrigin'))
   const parentWindow = window.parent
   const initialHashParams = new URLSearchParams(window.location.hash.slice(1))
+  const cursorStyleId = 'hp-preview-hidden-cursor'
+  let fullscreenCursorActive = false
+  let cursorHidden = false
+  let lastPointerReport = 0
 
   if (
     !session ||
@@ -20,6 +24,7 @@
   }
 
   window.addEventListener('message', handleParentMessage)
+  window.addEventListener('pointermove', reportPointerMove, { passive: true })
   window.addEventListener('hashchange', reportSlideChange)
   window.addEventListener('error', reportWindowError, true)
   window.addEventListener('unhandledrejection', reportUnhandledRejection)
@@ -134,8 +139,23 @@
       event.source !== parentWindow ||
       !isRecord(message) ||
       message.protocol !== PROTOCOL_VERSION ||
+      message.session !== session
+    ) {
+      return
+    }
+
+    if (message.type === 'preview:set-cursor-state') {
+      if (typeof message.fullscreen !== 'boolean' || typeof message.hidden !== 'boolean') {
+        return
+      }
+
+      fullscreenCursorActive = message.fullscreen
+      setCursorHidden(fullscreenCursorActive && message.hidden)
+      return
+    }
+
+    if (
       message.type !== 'preview:set-slide' ||
-      message.session !== session ||
       !Number.isInteger(message.page) ||
       message.page < 1
     ) {
@@ -151,6 +171,40 @@
     if (window.location.hash.slice(1) !== nextHash) {
       window.location.hash = nextHash
     }
+  }
+
+  function reportPointerMove() {
+    if (!fullscreenCursorActive) {
+      return
+    }
+
+    const now = performance.now()
+
+    if (!cursorHidden && now - lastPointerReport < 100) {
+      return
+    }
+
+    lastPointerReport = now
+    postToParent('preview:pointer-move')
+  }
+
+  function setCursorHidden(hidden) {
+    cursorHidden = hidden
+    const existingStyle = document.getElementById(cursorStyleId)
+
+    if (!hidden) {
+      existingStyle?.remove()
+      return
+    }
+
+    if (existingStyle) {
+      return
+    }
+
+    const style = document.createElement('style')
+    style.id = cursorStyleId
+    style.textContent = '*, *::before, *::after { cursor: none !important; }'
+    document.head.append(style)
   }
 
   function reportSlideChange() {

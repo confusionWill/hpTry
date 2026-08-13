@@ -77,8 +77,10 @@
           :class="{
             'live-preview__viewport--fixed': selectedAspectRatioValue !== null,
             'live-preview__viewport--focused': isPreviewFocused && !isPreviewFullscreen,
+            'live-preview__viewport--cursor-hidden': isPreviewCursorHidden,
           }"
           :style="previewViewportStyle"
+          @pointermove="handlePreviewPointerMove"
         >
           <iframe
             ref="previewFrameRef"
@@ -152,6 +154,8 @@ import {
 import { useAgentStore } from '@/stores/agent'
 import { usePresentationStore } from '@/stores/presentation'
 
+const FULLSCREEN_POINTER_SETTLE_MS = 1_000
+
 const props = withDefaults(
   defineProps<{
     readonly?: boolean
@@ -174,6 +178,7 @@ const previewHostFrameRef = ref<HTMLIFrameElement | null>(null)
 const previewFrameRef = ref<HTMLIFrameElement | null>(null)
 const previewViewportRef = ref<HTMLDivElement | null>(null)
 const isPreviewFullscreen = ref(false)
+const isPreviewCursorHidden = ref(false)
 const isPreviewFocused = ref(false)
 const isPreviewFocusHintVisible = ref(true)
 const previewValidationAttempt = ref(0)
@@ -182,6 +187,8 @@ let previewHostTimeout: ReturnType<typeof setTimeout> | null = null
 let previewHostPort: MessagePort | null = null
 let previewFocusSyncTimer: ReturnType<typeof setTimeout> | null = null
 let previewFocusHintTimer: ReturnType<typeof setTimeout> | null = null
+let previewCursorTimer: ReturnType<typeof setTimeout> | null = null
+let previewCursorRevealAt = 0
 let unregisterPreviewErrorValidator: (() => void) | null = null
 let pendingPreviewValidation: {
   projectId: string
@@ -249,6 +256,7 @@ onUnmounted(() => {
   cancelPendingPreviewValidation(new Error('Live preview was closed'))
   clearPreviewFocusSync()
   clearPreviewFocusHint()
+  clearPreviewCursorTimer()
   clearPreviewHostTimeout()
   closePreviewHostPort()
   presentationStore.endPreviewSession(previewSession)
@@ -430,6 +438,12 @@ function handlePreviewMessage(event: MessageEvent) {
 
   if (event.data.type === 'preview:ready') {
     navigatePreviewFrameToSlide(presentationStore.activeSlidePage)
+    syncPreviewCursorState()
+    return
+  }
+
+  if (event.data.type === 'preview:pointer-move') {
+    handlePreviewPointerMove()
     return
   }
 
@@ -787,7 +801,59 @@ function syncFullscreenState() {
 
   if (isPreviewFullscreen.value) {
     focusPreviewFrame()
+    clearPreviewCursorTimer()
+    previewCursorRevealAt = performance.now() + FULLSCREEN_POINTER_SETTLE_MS
+    isPreviewCursorHidden.value = true
+    syncPreviewCursorState()
+    return
   }
+
+  clearPreviewCursorTimer()
+  previewCursorRevealAt = 0
+  isPreviewCursorHidden.value = false
+  syncPreviewCursorState()
+}
+
+function handlePreviewPointerMove() {
+  if (
+    !isPreviewFullscreen.value ||
+    performance.now() < previewCursorRevealAt
+  ) {
+    return
+  }
+
+  clearPreviewCursorTimer()
+
+  if (isPreviewCursorHidden.value) {
+    isPreviewCursorHidden.value = false
+    syncPreviewCursorState()
+  }
+
+  previewCursorTimer = setTimeout(() => {
+    previewCursorTimer = null
+    isPreviewCursorHidden.value = true
+    syncPreviewCursorState()
+  }, 2_000)
+}
+
+function clearPreviewCursorTimer() {
+  if (previewCursorTimer) {
+    clearTimeout(previewCursorTimer)
+    previewCursorTimer = null
+  }
+}
+
+function syncPreviewCursorState() {
+  previewFrameRef.value?.contentWindow?.postMessage(
+    {
+      protocol: PREVIEW_PROTOCOL_VERSION,
+      type: 'preview:set-cursor-state',
+      session: previewSession,
+      fullscreen: isPreviewFullscreen.value,
+      hidden: isPreviewCursorHidden.value,
+    },
+    PREVIEW_ORIGIN,
+  )
 }
 
 function updatePreviewScale() {
@@ -934,6 +1000,10 @@ function clearPreviewFocusHint() {
   content: '';
   inset: 0;
   pointer-events: none;
+}
+
+.live-preview__viewport--cursor-hidden {
+  cursor: none;
 }
 
 .live-preview__frame {

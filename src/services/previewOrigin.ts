@@ -62,6 +62,7 @@ export interface PreviewMessage {
     | 'preview:error'
     | 'preview:ready'
     | 'preview:loaded'
+    | 'preview:pointer-move'
     | 'preview:slide-change'
     | 'preview:runtime-error'
   session: string
@@ -177,6 +178,14 @@ export function isPreviewMessage(value: unknown): value is PreviewMessage {
   }
 
   if (message.type === 'preview:ready' || message.type === 'preview:loaded') {
+    return (
+      message.target === 'document' &&
+      typeof message.projectId === 'string' &&
+      typeof message.version === 'string'
+    )
+  }
+
+  if (message.type === 'preview:pointer-move') {
     return (
       message.target === 'document' &&
       typeof message.projectId === 'string' &&
