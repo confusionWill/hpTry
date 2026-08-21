@@ -4,6 +4,28 @@ hpTry 是一个运行在浏览器中的 AI 演示文稿工作区。你可以通�
 
 项目数据保存在浏览器本地，不依赖业务后端。
 
+## 在线演示
+
+<table>
+  <tr>
+    <td>
+      <a href="https://s.hptry.com/demo/3d-model">
+        <img src="docs/images/demos/3d-model.png" alt="3D Model 演示预览" width="420">
+      </a>
+    </td>
+    <td>
+      <a href="https://s.hptry.com/demo/safari">
+        <img src="docs/images/demos/safari.png" alt="Safari 演示预览" width="420">
+      </a>
+    </td>
+    <td>
+      <a href="https://s.hptry.com/demo/tools">
+        <img src="docs/images/demos/tools.png" alt="工具箱演示预览" width="420">
+      </a>
+    </td>
+  </tr>
+</table>
+
 ## 功能特性
 
 - 实时预览生成的演示文稿，支持幻灯片列表、画布比例切换和全屏查看
